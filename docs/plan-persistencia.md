@@ -78,15 +78,36 @@ seguimiento (plantilla vacía).
 
 ### Incremento 0 — Decidir el stack de persistencia (sin código)
 
-No se edita nada. Se responden las 4 decisiones abiertas de `docs/onboarding.md`
-§5. Recomendación por defecto (lo mínimo que cumple el contrato):
+No se edita nada. Se cierran las 4 decisiones abiertas de `docs/onboarding.md`
+§5, adoptando en cada caso lo mínimo que cumple el contrato.
 
-| Decisión | Recomendación | Motivo |
-|---|---|---|
-| Migraciones | Alembic | Único estándar con `upgrade`/`downgrade`; lo pide el contrato. |
-| Capa de datos | SQLAlchemy 2.x, síncrono (Core/ORM) | El contrato no pide async; sync simplifica tests y Alembic. |
-| Driver | `psycopg` (v3), síncrono | Compatible con SQLAlchemy sync y Alembic sin bucle de eventos. |
-| Aislamiento de tests | PostgreSQL real vía Compose; cada test en transacción con `ROLLBACK`; migraciones aplicadas una vez por sesión de test | Rápido, determinista, sin SQLite. |
+**Decisión 1 — Migraciones: Alembic.**
+Único estándar con `upgrade`/`downgrade`; lo pide el contrato.
+Encaja con el repo: `docs/decisiones-ingenieria.md` ya nombra "migraciones Alembic"
+como mecanismo obligatorio y `CLAUDE.md` §Persistencia exige `upgrade`/`downgrade`
+probados en ambos sentidos; hoy no hay ninguna herramienta de migración en
+`pyproject.toml`, así que se añade sin desplazar nada.
+
+**Decisión 2 — Capa de datos: SQLAlchemy 2.x, síncrono (Core/ORM).**
+El contrato no pide async; sync simplifica tests y Alembic.
+Encaja con el repo: el único endpoint actual (`GET /health` en `app/main.py`) es
+síncrono y no hay capa de datos previa que fuerce async; `pydantic` ya entra como
+transitiva de FastAPI, y SQLAlchemy es el ORM que Alembic asume por defecto.
+
+**Decisión 3 — Driver: `psycopg` (v3), síncrono.**
+Compatible con SQLAlchemy sync y Alembic sin bucle de eventos.
+Encaja con el repo: la base es `postgres:18-alpine` (`compose.yaml`) y las
+variables de conexión ya existen en `.env.example` (`POSTGRES_USER`,
+`POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`); `psycopg` v3 consume esa URL
+sin dependencias de async que el resto del código no usa.
+
+**Decisión 4 — Aislamiento de tests: PostgreSQL real vía Compose; cada test en
+transacción con `ROLLBACK`; migraciones aplicadas una vez por sesión de test.**
+Rápido, determinista, sin SQLite.
+Encaja con el repo: `docs/decisiones-ingenieria.md` y `CLAUDE.md` §Persistencia
+prohíben SQLite y exigen PostgreSQL real; el servicio `db` de `compose.yaml` ya
+trae healthcheck, y no hay suite de persistencia previa cuyo aislamiento haya que
+respetar.
 
 **Comprobación:** acuerdo explícito en el hilo. Sin él no arranca el Incremento 1.
 
