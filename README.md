@@ -37,4 +37,16 @@ docker compose down
 
 `compose.yaml` trae valores locales por defecto, así que arranca sin `.env`. Para
 personalizarlo, copia `.env.example` a `.env` y ajusta `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_DB` y `POSTGRES_PORT`.
+`POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST` y `POSTGRES_PORT`.
+
+## Migraciones
+
+El esquema de la base se gestiona con Alembic. Con la base levantada:
+
+```bash
+uv run alembic upgrade head     # aplica todas las migraciones
+uv run alembic downgrade base   # revierte hasta dejar la base vacía
+```
+
+La configuración de Alembic se añade en un incremento posterior; hasta entonces
+estos comandos aún no tienen migraciones que aplicar.
