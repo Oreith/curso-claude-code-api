@@ -29,5 +29,10 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+# El directorio local `alembic/` hace que isort clasifique el paquete `alembic`
+# como first-party; es una dependencia de terceros.
+known-third-party = ["alembic"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
