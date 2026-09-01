@@ -1,9 +1,9 @@
 """Ciclo de migraciones contra el PostgreSQL real de Compose.
 
-Comprobación del Incremento 2: `upgrade head` sobre una base vacía deja solo el
-andamiaje de Alembic (`alembic_version`) y ninguna tabla de dominio; `downgrade
-base` revierte todas las revisiones y deja la base sin tablas de dominio, con
-`alembic_version` vacía.
+Comprobación del Incremento 2: `upgrade head` sobre una base vacía aplica todas
+las revisiones y registra la cabeza en `alembic_version`; `downgrade base`
+revierte todas las revisiones y deja la base sin tablas de dominio y sin
+revisión aplicada.
 
 Requiere el servicio `db` de `compose.yaml` levantado y sano
 (`docker compose up -d`).
@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
 from app.config import build_database_url
@@ -41,9 +42,11 @@ def alembic_config() -> Config:
 
 
 def _reset_base(engine, alembic_config) -> None:
+    """Deja la base sin ninguna tabla: revierte y borra todo lo que quede."""
     command.downgrade(alembic_config, "base")
     with engine.begin() as conn:
-        conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        for tabla in inspect(conn).get_table_names():
+            conn.execute(text(f'DROP TABLE IF EXISTS "{tabla}" CASCADE'))
 
 
 def _all_tables(engine) -> set[str]:
@@ -52,6 +55,12 @@ def _all_tables(engine) -> set[str]:
 
 def _domain_tables(engine) -> set[str]:
     return _all_tables(engine) - _SCAFFOLDING
+
+
+def _head_revision() -> str:
+    return ScriptDirectory.from_config(
+        Config(str(_REPO_ROOT / "alembic.ini"))
+    ).get_current_head()
 
 
 def _applied_revision(engine) -> str | None:
@@ -63,7 +72,6 @@ def _applied_revision(engine) -> str | None:
 
 @pytest.fixture(autouse=True)
 def base_limpia(engine, alembic_config):
-    """Deja la base sin ninguna tabla antes y después de cada test."""
     _reset_base(engine, alembic_config)
     yield
     _reset_base(engine, alembic_config)
@@ -74,10 +82,9 @@ def test_upgrade_head_sobre_base_vacia(engine, alembic_config):
 
     command.upgrade(alembic_config, "head")
 
-    # El andamiaje de Alembic existe; todavía no hay tablas de dominio.
+    # El andamiaje existe y la revisión aplicada es la cabeza del árbol.
     assert "alembic_version" in _all_tables(engine)
-    assert _domain_tables(engine) == set()
-    assert _applied_revision(engine) is not None
+    assert _applied_revision(engine) == _head_revision()
 
 
 def test_downgrade_base_deja_la_base_limpia(engine, alembic_config):
