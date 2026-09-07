@@ -5,7 +5,9 @@ importar este módulo.
 """
 
 from collections.abc import Iterator
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy.orm import Session, sessionmaker
 
 _sessionmaker: sessionmaker[Session] | None = None
@@ -25,3 +27,6 @@ def get_session() -> Iterator[Session]:
         yield session
     finally:
         session.close()
+
+
+SessionDep = Annotated[Session, Depends(get_session)]
