@@ -1,6 +1,11 @@
 """Esquemas de entrada y de respuesta de la API (ver `docs/contrato-api.md`)."""
 
+import unicodedata
+
 from pydantic import BaseModel, ConfigDict, field_validator
+
+# Categorías Unicode sin carácter visible (docs/contrato-api.md §Normalización).
+_CATEGORIAS_INVISIBLES = {"Cc", "Cf", "Zl", "Zp", "Zs"}
 
 
 class StateOut(BaseModel):
@@ -10,6 +15,21 @@ class StateOut(BaseModel):
 
     id: int
     code: str
+
+
+def _titulo_normalizado(value: str) -> str:
+    """Recorta `title` y rechaza el valor sin ningún carácter visible (`422`).
+
+    No basta con `strip()`: se rechaza si, tras recortar, todos los caracteres
+    caen en `Cc`, `Cf`, `Zl`, `Zp` o `Zs`. Los invisibles interiores de un
+    título con algún carácter visible se conservan.
+    """
+    recortado = value.strip()
+    if not any(
+        unicodedata.category(ch) not in _CATEGORIAS_INVISIBLES for ch in recortado
+    ):
+        raise ValueError("title no puede quedar sin ningún carácter visible")
+    return recortado
 
 
 def _name_limpio(value: str) -> str:
@@ -59,3 +79,50 @@ class ProjectOut(BaseModel):
     id: int
     name: str
     description: str | None
+
+
+class TaskCreate(BaseModel):
+    """Cuerpo de `POST /tasks` (v1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    description: str | None = None
+    project_id: int
+    state_id: int
+
+    _valida_title = field_validator("title")(_titulo_normalizado)
+
+
+class TaskUpdate(BaseModel):
+    """Cuerpo de `PATCH /tasks/{id}`: actualización parcial consistente.
+
+    Solo se modifican los campos presentes. `title`, si viene, se normaliza y no
+    puede quedar sin carácter visible. `description` admite `null` explícito.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = None
+    description: str | None = None
+    project_id: int | None = None
+    state_id: int | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _valida_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _titulo_normalizado(value)
+
+
+class TaskOut(BaseModel):
+    """Tarea tal como la devuelve la API (v1): cinco campos, ni uno más."""
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    id: int
+    title: str
+    description: str | None
+    project_id: int
+    state_id: int
