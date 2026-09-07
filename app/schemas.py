@@ -1,6 +1,11 @@
 """Esquemas de entrada y de respuesta de la API (ver `docs/contrato-api.md`)."""
 
+import unicodedata
+
 from pydantic import BaseModel, ConfigDict, field_validator
+
+# Categorías Unicode sin carácter visible (docs/contrato-api.md §Normalización).
+_CATEGORIAS_INVISIBLES = {"Cc", "Cf", "Zl", "Zp", "Zs"}
 
 
 class StateOut(BaseModel):
@@ -10,6 +15,21 @@ class StateOut(BaseModel):
 
     id: int
     code: str
+
+
+def _titulo_normalizado(value: str) -> str:
+    """Recorta `title` y rechaza el valor sin ningún carácter visible (`422`).
+
+    No basta con `strip()`: se rechaza si, tras recortar, todos los caracteres
+    caen en `Cc`, `Cf`, `Zl`, `Zp` o `Zs`. Los invisibles interiores de un
+    título con algún carácter visible se conservan.
+    """
+    recortado = value.strip()
+    if not any(
+        unicodedata.category(ch) not in _CATEGORIAS_INVISIBLES for ch in recortado
+    ):
+        raise ValueError("title no puede quedar sin ningún carácter visible")
+    return recortado
 
 
 def _name_limpio(value: str) -> str:
