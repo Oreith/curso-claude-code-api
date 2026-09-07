@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.db import make_engine, make_sessionmaker
 from app.deps import SessionDep, set_sessionmaker
 from app.models import State
-from app.routers import projects
+from app.routers import projects, tasks
 from app.schemas import StateOut
 
 
@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="TaskFlow API", lifespan=lifespan)
 app.include_router(projects.router)
+app.include_router(tasks.router)
 
 
 @app.get("/health")
