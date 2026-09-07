@@ -68,11 +68,17 @@ def _rows(engine) -> list[tuple[int, str, int]]:
 
 
 def _run_seed_again(engine) -> None:
-    """Re-ejecuta el bloque de seed de la revisión cabeza."""
+    """Re-ejecuta el bloque de seed de la revisión que lo define.
+
+    Se localiza por el atributo `seed_states`, no por ser la cabeza del árbol:
+    con más revisiones encima (projects, tasks, ...) la cabeza ya no es la del
+    catálogo.
+    """
     script = ScriptDirectory.from_config(Config(str(_REPO_ROOT / "alembic.ini")))
-    head = script.get_revision(script.get_current_head())
+    revs = [r for r in script.walk_revisions() if hasattr(r.module, "seed_states")]
+    assert len(revs) == 1, f"se esperaba una sola revisión con seed, hay {len(revs)}"
     with engine.begin() as conn:
-        head.module.seed_states(conn)
+        revs[0].module.seed_states(conn)
 
 
 def test_upgrade_head_crea_los_cuatro_codigos(engine, alembic_config):
