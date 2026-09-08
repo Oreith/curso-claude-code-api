@@ -10,6 +10,11 @@ y Python 3.12.
 | `GET /health` | `200` con `{"status": "ok"}` |
 | `GET /states` | Catálogo cerrado de estados desde PostgreSQL |
 | `POST /projects` · `GET /projects` · `GET /projects/{id}` · `PATCH /projects/{id}` · `DELETE /projects/{id}` | CRUD de proyectos; `DELETE` responde `409` si el proyecto tiene tareas |
+| `POST /tasks` · `GET /tasks` · `GET /tasks/{id}` · `PATCH /tasks/{id}` · `DELETE /tasks/{id}` | CRUD de tareas. `GET /tasks` admite `?project_id=`, `?state_id=` y `?overdue=true`, solos o combinados |
+
+`due_at` es opcional, debe llevar zona horaria y se devuelve siempre en UTC con
+sufijo `Z` y sin microsegundos. `?overdue=true` filtra las tareas con `due_at`
+pasado y estado distinto de `HECHA`.
 
 El comportamiento observable vinculante está en `docs/contrato-api.md`.
 
