@@ -1,5 +1,7 @@
 """Endpoints de `/tasks` (ver `docs/contrato-api.md` §Tareas v1, v2 y v3)."""
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -67,14 +69,14 @@ def list_tasks(
     session: SessionDep,
     project_id: int | None = None,
     state_id: int | None = None,
-    overdue: bool = False,
+    overdue: Literal["true", "false"] | None = None,
 ) -> list[Task]:
     stmt = select(Task)
     if project_id is not None:
         stmt = stmt.where(Task.project_id == project_id)
     if state_id is not None:
         stmt = stmt.where(Task.state_id == state_id)
-    if overdue:
+    if overdue == "true":
         hecha_id = session.scalar(select(State.id).where(State.code == "HECHA"))
         stmt = stmt.where(
             Task.due_at.is_not(None),
