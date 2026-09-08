@@ -132,4 +132,25 @@ def test_overdue_false_no_filtra(client, estados):
     _tarea(client, p, estados["PENDIENTE"], _FUTURO)
     _tarea(client, p, estados["PENDIENTE"], None)
     assert len(client.get("/tasks?overdue=false").json()) == 2
-    assert len(client.get("/tasks").json()) == 2
+
+
+@pytest.mark.parametrize(
+    "valor", ["TRUE", "True", "tRuE", "1", "yes", "on", "banana", ""]
+)
+def test_overdue_solo_true_false_minusculas_el_resto_422(client, estados, valor):
+    """docs/contrato-api.md §Tareas v2: `overdue` admite exactamente `true` y
+    `false` en minúsculas; cualquier otro valor es `422`."""
+    p = _proyecto(client)
+    _tarea(client, p, estados["PENDIENTE"], _PASADO)
+
+    resp = client.get(f"/tasks?overdue={valor}")
+    assert resp.status_code == 422, f"overdue={valor!r} debería ser 422"
+    assert "detail" in resp.json()
+
+
+def test_overdue_true_y_false_minusculas_siguen_valiendo(client, estados):
+    p = _proyecto(client)
+    _tarea(client, p, estados["PENDIENTE"], _PASADO)
+    assert len(client.get("/tasks?overdue=true").json()) == 1
+    assert len(client.get("/tasks?overdue=false").json()) == 1
+    assert len(client.get("/tasks").json()) == 1

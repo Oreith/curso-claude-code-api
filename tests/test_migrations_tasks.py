@@ -64,6 +64,7 @@ def test_columnas_de_tasks(engine, alembic_config):
         "project_id",
         "state_id",
         "due_at",
+        "priority",
     }
     assert cols["title"]["nullable"] is False
     assert cols["description"]["nullable"] is True
@@ -71,15 +72,33 @@ def test_columnas_de_tasks(engine, alembic_config):
     assert cols["state_id"]["nullable"] is False
     assert cols["due_at"]["nullable"] is True
     assert "TIMESTAMP" in str(cols["due_at"]["type"]).upper()
+    assert cols["priority"]["nullable"] is True
 
     pk = tuple(inspect(engine).get_pk_constraint("tasks")["constrained_columns"])
     assert pk == ("id",)
 
 
-def test_downgrade_due_at_conserva_el_resto(engine, alembic_config):
+def test_priority_check_constraint(engine, alembic_config):
     command.upgrade(alembic_config, "head")
-    command.downgrade(alembic_config, "-1")  # revierte solo due_at (rollback v2)
 
+    checks = {
+        c["name"]: c.get("sqltext", "")
+        for c in inspect(engine).get_check_constraints("tasks")
+    }
+    assert "ck_tasks_priority" in checks
+    sql = checks["ck_tasks_priority"].upper()
+    for valor in ("BAJA", "MEDIA", "ALTA"):
+        assert valor in sql
+
+
+def test_rollback_de_v3_y_v2_conserva_el_resto(engine, alembic_config):
+    command.upgrade(alembic_config, "head")
+    command.downgrade(alembic_config, "-1")  # revierte priority (rollback v3)
+
+    cols = {c["name"] for c in inspect(engine).get_columns("tasks")}
+    assert cols == {"id", "title", "description", "project_id", "state_id", "due_at"}
+
+    command.downgrade(alembic_config, "-1")  # revierte due_at (rollback v2)
     cols = {c["name"] for c in inspect(engine).get_columns("tasks")}
     assert cols == {"id", "title", "description", "project_id", "state_id"}
     fks = inspect(engine).get_foreign_keys("tasks")
@@ -89,7 +108,8 @@ def test_downgrade_due_at_conserva_el_resto(engine, alembic_config):
     }
 
     command.upgrade(alembic_config, "head")
-    assert "due_at" in {c["name"] for c in inspect(engine).get_columns("tasks")}
+    cols = {c["name"] for c in inspect(engine).get_columns("tasks")}
+    assert {"due_at", "priority"} <= cols
 
 
 def test_claves_foraneas_con_restrict(engine, alembic_config):
@@ -115,7 +135,8 @@ def test_downgrade_de_tasks_quita_la_tabla_y_conserva_projects_y_states(
     command.upgrade(alembic_config, "head")
     assert {"tasks", "projects", "states"} <= set(inspect(engine).get_table_names())
 
-    # Revierte due_at (v2) y luego la creación de tasks, sin ids fijos.
+    # Revierte priority (v3), due_at (v2) y luego la creación de tasks, sin ids fijos.
+    command.downgrade(alembic_config, "-1")
     command.downgrade(alembic_config, "-1")
     command.downgrade(alembic_config, "-1")
 

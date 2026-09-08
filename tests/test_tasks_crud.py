@@ -77,7 +77,15 @@ def _crear(client, proyecto_id, estado_id, title="Regar", **extra):
 
 # --- Incremento 2: POST y GET /{id} -----------------------------------------
 
-_ESQUEMA_TAREA = {"id", "title", "description", "project_id", "state_id", "due_at"}
+_ESQUEMA_TAREA = {
+    "id",
+    "title",
+    "description",
+    "project_id",
+    "state_id",
+    "due_at",
+    "priority",
+}
 
 
 def test_post_crea_201_y_esquema_exacto(client, proyecto_id, estado_id):
@@ -126,7 +134,7 @@ def test_post_state_id_inexistente_422(client, proyecto_id):
 
 
 def test_post_campo_desconocido_422(client, proyecto_id, estado_id):
-    resp = _crear(client, proyecto_id, estado_id, prioridad="alta")
+    resp = _crear(client, proyecto_id, estado_id, etiqueta="rojo")
     assert resp.status_code == 422
     assert "detail" in resp.json()
 
@@ -216,7 +224,7 @@ def test_patch_id_inexistente_404(client):
 
 def test_patch_campo_desconocido_422(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id).json()
-    resp = client.patch(f"/tasks/{creada['id']}", json={"prioridad": "alta"})
+    resp = client.patch(f"/tasks/{creada['id']}", json={"etiqueta": "rojo"})
     assert resp.status_code == 422
 
 

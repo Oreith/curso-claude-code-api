@@ -115,8 +115,26 @@ ambigua, y el contrato no supone ninguna por su cuenta.
 `GET /tasks?overdue=true` devuelve tareas con `due_at` anterior al instante de
 evaluación y estado distinto de `HECHA`. Una tarea sin fecha no está vencida.
 
+El parámetro `overdue` admite **exactamente** `true` y `false`, en minúsculas:
+`true` activa el filtro, `false` (o la ausencia del parámetro) lo deja
+inactivo, y cualquier otro valor —`TRUE`, `1`, `yes`, una cadena arbitraria—
+se rechaza con `422`.
+
 Fuera de alcance: recordatorios, scheduler, zona preferida del usuario y cambio
 automático de estado.
+
+## Tareas v3: Prioridad
+
+Se añade `priority`, opcional. Cuando está presente, su valor es uno de `BAJA`,
+`MEDIA` o `ALTA` — un conjunto cerrado de literales, no una tabla y sin endpoint
+propio. Cualquier otro valor (otra cadena, distinta capitalización, un número)
+se rechaza con `422`.
+
+Omitirlo conserva compatibilidad con v1 y v2: una tarea sin prioridad se
+devuelve con `priority` en `null`, no se omite. `PATCH` puede fijarla,
+cambiarla o volverla a `null` explícitamente.
+
+`priority` no altera el orden de `GET /tasks`, que sigue siendo por `id`.
 
 ## Esquemas de Respuesta
 
@@ -130,14 +148,15 @@ sobra rompe a quien consuma la API igual que uno que falta.
 // Proyecto
 {"id": 1, "name": "Casa", "description": null}
 
-// Tarea (v2; en v1, sin due_at)
+// Tarea (v3; en v2 sin priority, en v1 además sin due_at)
 {
   "id": 1,
   "title": "Regar las plantas",
   "description": null,
   "project_id": 1,
   "state_id": 1,
-  "due_at": "2026-03-01T09:00:00Z"
+  "due_at": "2026-03-01T09:00:00Z",
+  "priority": null
 }
 ```
 
@@ -160,8 +179,10 @@ Tres detalles que deciden si dos implementaciones son intercambiables:
 - Filtros solos y combinados.
 - Orden estable: dos llamadas idénticas devuelven los ids en la misma posición.
 - Esquema de respuesta exacto: los campos declarados, ni uno más.
-- Migración desde base vacía y rollback de v2.
+- Migración desde base vacía y rollback de v2 y de v3.
 - El catálogo de estados existe tras migrar, y migrar dos veces no lo duplica.
 - `due_at` omitido, válido, sin zona, vencido, futuro y tarea hecha.
+- `overdue` acepta solo `true`/`false` en minúsculas; cualquier otro valor es `422`.
+- `priority` omitido, con cada valor válido y con valor inválido.
 
 Los tests pueden incluir casos adicionales. No pueden debilitar estas invariantes.

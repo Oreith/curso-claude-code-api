@@ -112,6 +112,7 @@ class TaskCreate(BaseModel):
     project_id: int
     state_id: int
     due_at: datetime | None = None
+    priority: str | None = None
 
     _valida_title = field_validator("title")(_titulo_normalizado)
     _valida_due_at = field_validator("due_at")(_due_at_utc)
@@ -121,8 +122,9 @@ class TaskUpdate(BaseModel):
     """Cuerpo de `PATCH /tasks/{id}`: actualización parcial consistente.
 
     Solo se modifican los campos presentes. `title`, si viene, se normaliza y no
-    puede quedar sin carácter visible. `description` y `due_at` admiten `null`
-    explícito; `due_at`, si viene con valor, debe llevar zona horaria.
+    puede quedar sin carácter visible. `description`, `due_at` y `priority`
+    admiten `null` explícito; `due_at`, si viene con valor, debe llevar zona
+    horaria.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -132,6 +134,7 @@ class TaskUpdate(BaseModel):
     project_id: int | None = None
     state_id: int | None = None
     due_at: datetime | None = None
+    priority: str | None = None
 
     @field_validator("title")
     @classmethod
@@ -144,10 +147,10 @@ class TaskUpdate(BaseModel):
 
 
 class TaskOut(BaseModel):
-    """Tarea tal como la devuelve la API (v2): seis campos, ni uno más.
+    """Tarea tal como la devuelve la API (v3): siete campos, ni uno más.
 
     `due_at` siempre en UTC con sufijo `Z` y sin microsegundos; `null` si no
-    tiene fecha.
+    tiene fecha. `priority` es `null` o uno de BAJA/MEDIA/ALTA.
     """
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
@@ -158,6 +161,7 @@ class TaskOut(BaseModel):
     project_id: int
     state_id: int
     due_at: datetime | None
+    priority: str | None
 
     @field_serializer("due_at")
     def _serializa_due_at(self, value: datetime | None) -> str | None:
