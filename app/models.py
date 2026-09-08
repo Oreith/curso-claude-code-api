@@ -35,7 +35,8 @@ class Project(Base):
 
 class Task(Base):
     """Tarea. Campos del contrato: `id`, `title`, `description` opcional,
-    `project_id`, `state_id`, y `due_at` opcional (v2, en UTC)."""
+    `project_id`, `state_id`, `due_at` opcional (v2, UTC) y `priority` opcional
+    (v3, uno de BAJA/MEDIA/ALTA)."""
 
     __tablename__ = "tasks"
 
@@ -51,3 +52,4 @@ class Task(Base):
     due_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    priority: Mapped[str | None] = mapped_column(String, nullable=True)
