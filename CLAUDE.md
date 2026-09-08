@@ -30,6 +30,9 @@ Ruff aplica `E, F, I, UP, B` con `line-length = 88`. `pytest` corre sobre
 
 - Antes de tocar cualquier endpoint, lee las secciones **Esquemas de Respuesta**
   y **Orden de las listas** de `docs/contrato-api.md`.
+- Endpoints y campos: esquema de respuesta exacto del contrato, y un campo nuevo
+  son tres capas (migración, esquema, validación). Rutas de las carpetas y el
+  ejemplo `priority` en `.claude/rules/api-conventions.md`.
 - Normalización de `title`: no basta `strip()`; hay que rechazar con `422` por
   categoría Unicode `Cc, Cf, Zl, Zp, Zs` (ver `docs/contrato-api.md`).
 - `due_at` se serializa en UTC con sufijo `Z` (no `+00:00`) y sin microsegundos.
@@ -48,6 +51,15 @@ Ruff aplica `E, F, I, UP, B` con `line-length = 88`. `pytest` corre sobre
 - No debilites ni elimines un test existente para conseguir verde. Si el
   comportamiento acordado cambió, edita antes el contrato y luego el test, en un
   commit separado.
+- Fallos reportados: se reproducen antes de corregirlos y la reproducción se
+  conserva. Ver `.claude/rules/testing.md`.
+
+## Reparto de commits
+
+- Repartir o reorganizar cambios del árbol en commits (p. ej. la skill
+  `segmentar-commits`) nunca reescribe código para simular un estado
+  intermedio: solo `git add`, completo o con `git add -p`. Ver
+  `.claude/rules/code-style.md`.
 
 ## Secretos
 
