@@ -115,6 +115,11 @@ ambigua, y el contrato no supone ninguna por su cuenta.
 `GET /tasks?overdue=true` devuelve tareas con `due_at` anterior al instante de
 evaluación y estado distinto de `HECHA`. Una tarea sin fecha no está vencida.
 
+El parámetro `overdue` admite **exactamente** `true` y `false`, en minúsculas:
+`true` activa el filtro, `false` (o la ausencia del parámetro) lo deja
+inactivo, y cualquier otro valor —`TRUE`, `1`, `yes`, una cadena arbitraria—
+se rechaza con `422`.
+
 Fuera de alcance: recordatorios, scheduler, zona preferida del usuario y cambio
 automático de estado.
 
@@ -177,6 +182,7 @@ Tres detalles que deciden si dos implementaciones son intercambiables:
 - Migración desde base vacía y rollback de v2 y de v3.
 - El catálogo de estados existe tras migrar, y migrar dos veces no lo duplica.
 - `due_at` omitido, válido, sin zona, vencido, futuro y tarea hecha.
+- `overdue` acepta solo `true`/`false` en minúsculas; cualquier otro valor es `422`.
 - `priority` omitido, con cada valor válido y con valor inválido.
 
 Los tests pueden incluir casos adicionales. No pueden debilitar estas invariantes.
