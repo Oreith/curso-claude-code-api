@@ -19,7 +19,7 @@ from app.config import build_database_url
 from app.main import app
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_ESQUEMA_V1 = {"id", "title", "description", "project_id", "state_id"}
+_ESQUEMA_TAREA = {"id", "title", "description", "project_id", "state_id", "due_at"}
 
 
 @pytest.fixture(scope="module")
@@ -89,7 +89,7 @@ def test_orden_por_id_estable_y_esquema(client, estados):
     assert isinstance(cuerpo, list)
     ids = [t["id"] for t in cuerpo]
     assert ids == sorted(ids)
-    assert all(set(t) == _ESQUEMA_V1 for t in cuerpo)
+    assert all(set(t) == _ESQUEMA_TAREA for t in cuerpo)
     assert client.get("/tasks").json() == cuerpo
 
 
