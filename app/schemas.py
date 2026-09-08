@@ -1,11 +1,32 @@
 """Esquemas de entrada y de respuesta de la API (ver `docs/contrato-api.md`)."""
 
 import unicodedata
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 # Categorías Unicode sin carácter visible (docs/contrato-api.md §Normalización).
 _CATEGORIAS_INVISIBLES = {"Cc", "Cf", "Zl", "Zp", "Zs"}
+
+
+def _due_at_utc(value: datetime | None) -> datetime | None:
+    """Rechaza el `datetime` sin zona (`422`) y normaliza a UTC.
+
+    El contrato no supone ninguna zona por su cuenta (docs/contrato-api.md
+    §Tareas v2): una fecha sin zona es ambigua y se rechaza.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("due_at debe incluir zona horaria")
+    return value.astimezone(UTC)
+
+
+def _due_at_z(value: datetime | None) -> str | None:
+    """Serializa `due_at` en UTC con sufijo `Z` y sin microsegundos."""
+    if value is None:
+        return None
+    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class StateOut(BaseModel):
@@ -82,7 +103,7 @@ class ProjectOut(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    """Cuerpo de `POST /tasks` (v1)."""
+    """Cuerpo de `POST /tasks`."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -90,15 +111,18 @@ class TaskCreate(BaseModel):
     description: str | None = None
     project_id: int
     state_id: int
+    due_at: datetime | None = None
 
     _valida_title = field_validator("title")(_titulo_normalizado)
+    _valida_due_at = field_validator("due_at")(_due_at_utc)
 
 
 class TaskUpdate(BaseModel):
     """Cuerpo de `PATCH /tasks/{id}`: actualización parcial consistente.
 
     Solo se modifican los campos presentes. `title`, si viene, se normaliza y no
-    puede quedar sin carácter visible. `description` admite `null` explícito.
+    puede quedar sin carácter visible. `description` y `due_at` admiten `null`
+    explícito; `due_at`, si viene con valor, debe llevar zona horaria.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -107,6 +131,7 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     project_id: int | None = None
     state_id: int | None = None
+    due_at: datetime | None = None
 
     @field_validator("title")
     @classmethod
@@ -115,9 +140,15 @@ class TaskUpdate(BaseModel):
             return None
         return _titulo_normalizado(value)
 
+    _valida_due_at = field_validator("due_at")(_due_at_utc)
+
 
 class TaskOut(BaseModel):
-    """Tarea tal como la devuelve la API (v1): cinco campos, ni uno más."""
+    """Tarea tal como la devuelve la API (v2): seis campos, ni uno más.
+
+    `due_at` siempre en UTC con sufijo `Z` y sin microsegundos; `null` si no
+    tiene fecha.
+    """
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
@@ -126,3 +157,8 @@ class TaskOut(BaseModel):
     description: str | None
     project_id: int
     state_id: int
+    due_at: datetime | None
+
+    @field_serializer("due_at")
+    def _serializa_due_at(self, value: datetime | None) -> str | None:
+        return _due_at_z(value)

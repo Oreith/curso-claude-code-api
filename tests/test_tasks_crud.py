@@ -77,14 +77,14 @@ def _crear(client, proyecto_id, estado_id, title="Regar", **extra):
 
 # --- Incremento 2: POST y GET /{id} -----------------------------------------
 
-_ESQUEMA_V1 = {"id", "title", "description", "project_id", "state_id"}
+_ESQUEMA_TAREA = {"id", "title", "description", "project_id", "state_id", "due_at"}
 
 
-def test_post_crea_201_y_esquema_v1_exacto(client, proyecto_id, estado_id):
+def test_post_crea_201_y_esquema_exacto(client, proyecto_id, estado_id):
     resp = _crear(client, proyecto_id, estado_id)
     assert resp.status_code == 201
     cuerpo = resp.json()
-    assert set(cuerpo) == _ESQUEMA_V1
+    assert set(cuerpo) == _ESQUEMA_TAREA
     assert cuerpo["title"] == "Regar"
     assert cuerpo["description"] is None
     assert cuerpo["project_id"] == proyecto_id
@@ -126,7 +126,7 @@ def test_post_state_id_inexistente_422(client, proyecto_id):
 
 
 def test_post_campo_desconocido_422(client, proyecto_id, estado_id):
-    resp = _crear(client, proyecto_id, estado_id, due_at="2026-03-01T09:00:00Z")
+    resp = _crear(client, proyecto_id, estado_id, prioridad="alta")
     assert resp.status_code == 422
     assert "detail" in resp.json()
 
@@ -136,12 +136,12 @@ def test_post_falta_campo_obligatorio_422(client, proyecto_id):
     assert resp.status_code == 422
 
 
-def test_get_por_id_200_esquema_v1_exacto(client, proyecto_id, estado_id):
+def test_get_por_id_200_esquema_exacto(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id).json()
     resp = client.get(f"/tasks/{creada['id']}")
     assert resp.status_code == 200
     assert resp.json() == creada
-    assert set(resp.json()) == _ESQUEMA_V1
+    assert set(resp.json()) == _ESQUEMA_TAREA
 
 
 def test_get_por_id_inexistente_404(client):
@@ -216,8 +216,7 @@ def test_patch_id_inexistente_404(client):
 
 def test_patch_campo_desconocido_422(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id).json()
-    tid = creada["id"]
-    resp = client.patch(f"/tasks/{tid}", json={"due_at": "2026-03-01T09:00:00Z"})
+    resp = client.patch(f"/tasks/{creada['id']}", json={"prioridad": "alta"})
     assert resp.status_code == 422
 
 

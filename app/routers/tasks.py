@@ -1,7 +1,7 @@
 """Endpoints de `/tasks` (ver `docs/contrato-api.md` §Tareas v1 y §Tareas v2)."""
 
 from fastapi import APIRouter, HTTPException, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.deps import SessionDep
@@ -41,6 +41,7 @@ def create_task(payload: TaskCreate, session: SessionDep) -> Task:
         description=payload.description,
         project_id=payload.project_id,
         state_id=payload.state_id,
+        due_at=payload.due_at,
     )
     session.add(task)
     session.commit()
@@ -53,12 +54,20 @@ def list_tasks(
     session: SessionDep,
     project_id: int | None = None,
     state_id: int | None = None,
+    overdue: bool = False,
 ) -> list[Task]:
     stmt = select(Task)
     if project_id is not None:
         stmt = stmt.where(Task.project_id == project_id)
     if state_id is not None:
         stmt = stmt.where(Task.state_id == state_id)
+    if overdue:
+        hecha_id = session.scalar(select(State.id).where(State.code == "HECHA"))
+        stmt = stmt.where(
+            Task.due_at.is_not(None),
+            Task.due_at < func.now(),
+            Task.state_id != hecha_id,
+        )
     stmt = stmt.order_by(Task.id)
     return list(session.scalars(stmt))
 
