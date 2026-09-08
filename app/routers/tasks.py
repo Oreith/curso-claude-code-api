@@ -1,4 +1,4 @@
-"""Endpoints de `/tasks` (ver `docs/contrato-api.md` §Tareas v1 y §Tareas v2)."""
+"""Endpoints de `/tasks` (ver `docs/contrato-api.md` §Tareas v1, v2 y v3)."""
 
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import func, select
@@ -9,6 +9,9 @@ from app.models import Project, State, Task
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+# Conjunto cerrado de prioridades (docs/contrato-api.md §Tareas v3).
+_PRIORIDADES = {"BAJA", "MEDIA", "ALTA"}
 
 
 def _task_o_404(session: Session, task_id: int) -> Task:
@@ -32,16 +35,26 @@ def _valida_state_id(session: Session, state_id: int) -> None:
         )
 
 
+def _valida_priority(value: str | None) -> None:
+    if value is not None and value not in _PRIORIDADES:
+        raise HTTPException(
+            status_code=422,
+            detail="priority debe ser uno de BAJA, MEDIA o ALTA",
+        )
+
+
 @router.post("", response_model=TaskOut, status_code=201)
 def create_task(payload: TaskCreate, session: SessionDep) -> Task:
     _valida_project_id(session, payload.project_id)
     _valida_state_id(session, payload.state_id)
+    _valida_priority(payload.priority)
     task = Task(
         title=payload.title,
         description=payload.description,
         project_id=payload.project_id,
         state_id=payload.state_id,
         due_at=payload.due_at,
+        priority=payload.priority,
     )
     session.add(task)
     session.commit()
@@ -85,6 +98,8 @@ def patch_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
         _valida_project_id(session, cambios["project_id"])
     if "state_id" in cambios:
         _valida_state_id(session, cambios["state_id"])
+    if "priority" in cambios:
+        _valida_priority(cambios["priority"])
     for campo, valor in cambios.items():
         setattr(task, campo, valor)
     session.commit()

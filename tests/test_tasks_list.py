@@ -19,7 +19,15 @@ from app.config import build_database_url
 from app.main import app
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_ESQUEMA_TAREA = {"id", "title", "description", "project_id", "state_id", "due_at"}
+_ESQUEMA_TAREA = {
+    "id",
+    "title",
+    "description",
+    "project_id",
+    "state_id",
+    "due_at",
+    "priority",
+}
 
 
 @pytest.fixture(scope="module")

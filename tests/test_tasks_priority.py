@@ -1,9 +1,8 @@
-"""`due_at` en entrada y salida de `/tasks` (Tareas v2).
+"""`priority` en `/tasks` (Tareas v3).
 
-Contrato §Tareas v2 y §Esquemas de Respuesta: `due_at` opcional, con zona
-horaria, normalizado a UTC; se serializa siempre en UTC con sufijo `Z` y sin
-microsegundos; omitirlo conserva la compatibilidad v1; una fecha sin zona se
-rechaza con `422`.
+Contrato §Tareas v3: campo opcional; su valor, si está presente, es uno de
+`BAJA`, `MEDIA` o `ALTA`; cualquier otro valor se rechaza con `422`; omitirlo
+lo devuelve como `null`; `PATCH` puede fijarlo, cambiarlo o volverlo a `null`.
 
 Requiere el servicio `db` de `compose.yaml` levantado y sano.
 """
@@ -81,66 +80,60 @@ def _crear(client, proyecto_id, estado_id, **extra):
     return client.post("/tasks", json=cuerpo)
 
 
-def test_post_sin_due_at_devuelve_null(client, proyecto_id, estado_id):
+def test_post_sin_priority_devuelve_null(client, proyecto_id, estado_id):
     cuerpo = _crear(client, proyecto_id, estado_id).json()
     assert set(cuerpo) == _ESQUEMA_TAREA
-    assert cuerpo["due_at"] is None
+    assert cuerpo["priority"] is None
 
 
-def test_post_due_at_con_offset_se_normaliza_a_z(client, proyecto_id, estado_id):
-    cuerpo = _crear(
-        client, proyecto_id, estado_id, due_at="2026-03-01T11:00:00+02:00"
-    ).json()
-    assert cuerpo["due_at"] == "2026-03-01T09:00:00Z"
+@pytest.mark.parametrize("valor", ["BAJA", "MEDIA", "ALTA"])
+def test_post_priority_valida(client, proyecto_id, estado_id, valor):
+    resp = _crear(client, proyecto_id, estado_id, priority=valor)
+    assert resp.status_code == 201
+    assert resp.json()["priority"] == valor
 
 
-def test_post_due_at_con_z(client, proyecto_id, estado_id):
-    cuerpo = _crear(
-        client, proyecto_id, estado_id, due_at="2026-03-01T09:00:00Z"
-    ).json()
-    assert cuerpo["due_at"] == "2026-03-01T09:00:00Z"
-
-
-def test_post_due_at_con_microsegundos_se_trunca(client, proyecto_id, estado_id):
-    cuerpo = _crear(
-        client, proyecto_id, estado_id, due_at="2026-03-01T09:00:00.123456Z"
-    ).json()
-    assert cuerpo["due_at"] == "2026-03-01T09:00:00Z"
-
-
-def test_post_due_at_sin_zona_422(client, proyecto_id, estado_id):
-    resp = _crear(client, proyecto_id, estado_id, due_at="2026-03-01T09:00:00")
+@pytest.mark.parametrize("valor", ["URGENTE", "alta", "baja", "", "1", 3])
+def test_post_priority_invalida_422(client, proyecto_id, estado_id, valor):
+    resp = _crear(client, proyecto_id, estado_id, priority=valor)
     assert resp.status_code == 422
     assert "detail" in resp.json()
 
 
-def test_post_due_at_null_explicito(client, proyecto_id, estado_id):
-    cuerpo = _crear(client, proyecto_id, estado_id, due_at=None).json()
-    assert cuerpo["due_at"] is None
+def test_post_priority_null_explicito(client, proyecto_id, estado_id):
+    creada = _crear(client, proyecto_id, estado_id, priority=None).json()
+    assert creada["priority"] is None
 
 
-def test_patch_due_at_pone_y_quita(client, proyecto_id, estado_id):
+def test_patch_priority_pone_cambia_y_quita(client, proyecto_id, estado_id):
     tid = _crear(client, proyecto_id, estado_id).json()["id"]
 
-    puesta = client.patch(
-        f"/tasks/{tid}", json={"due_at": "2026-03-01T09:00:00Z"}
-    ).json()
-    assert puesta["due_at"] == "2026-03-01T09:00:00Z"
+    def patch(valor):
+        r = client.patch(f"/tasks/{tid}", json={"priority": valor})
+        return r.json()["priority"]
 
-    quitada = client.patch(f"/tasks/{tid}", json={"due_at": None}).json()
-    assert quitada["due_at"] is None
+    assert patch("ALTA") == "ALTA"
+    assert patch("BAJA") == "BAJA"
+    assert patch(None) is None
 
 
-def test_patch_due_at_sin_zona_422(client, proyecto_id, estado_id):
+def test_patch_priority_invalida_422(client, proyecto_id, estado_id):
     tid = _crear(client, proyecto_id, estado_id).json()["id"]
-    resp = client.patch(f"/tasks/{tid}", json={"due_at": "2026-03-01T09:00:00"})
+    resp = client.patch(f"/tasks/{tid}", json={"priority": "media"})
     assert resp.status_code == 422
+    assert "detail" in resp.json()
 
 
-def test_get_por_id_incluye_due_at(client, proyecto_id, estado_id):
-    creada = _crear(
-        client, proyecto_id, estado_id, due_at="2026-03-01T09:00:00Z"
-    ).json()
+def test_priority_no_altera_el_orden(client, proyecto_id, estado_id):
+    a = _crear(client, proyecto_id, estado_id, priority="BAJA").json()["id"]
+    b = _crear(client, proyecto_id, estado_id, priority="ALTA").json()["id"]
+    c = _crear(client, proyecto_id, estado_id).json()["id"]
+    ids = [t["id"] for t in client.get("/tasks").json()]
+    assert ids == sorted([a, b, c])
+
+
+def test_get_por_id_incluye_priority(client, proyecto_id, estado_id):
+    creada = _crear(client, proyecto_id, estado_id, priority="MEDIA").json()
     obtenida = client.get(f"/tasks/{creada['id']}").json()
     assert obtenida == creada
     assert set(obtenida) == _ESQUEMA_TAREA
