@@ -49,9 +49,9 @@ Una **intención** es un cambio que se explica en una frase sin la palabra "y":
 al truncar", "adapta el test del ciclo a más de una revisión".
 
 - Agrupa por lo que el cambio **consigue**, no por el archivo. Un mismo archivo
-  puede repartirse entre commits (`git add -p`); varios archivos pueden ir en un
-  commit si sirven a la misma intención (código + su test + la línea de README
-  que lo documenta).
+  puede repartirse entre commits tomando sus *hunks* con `git add -p`; varios
+  archivos pueden ir en un commit si sirven a la misma intención (código + su
+  test + la línea de README que lo documenta).
 - Un refactor o un movimiento de código va **separado** de un cambio de
   comportamiento, aunque toquen el mismo archivo.
 - Si un cambio obligó a tocar un test existente (una referencia frágil que se
@@ -115,9 +115,13 @@ cambios y, si el reparto cambia de forma, vuelve a enseñarlo.
 Una vez aprobado, y solo entonces:
 
 1. Haz los commits **uno a uno, en el orden acordado**.
-2. Para cada uno: acota el `git add` a sus archivos o *hunks*, enseña el mensaje
-   final, `git commit`, y ejecuta su **Comprobación** antes de pasar al
-   siguiente.
+2. Para cada uno: arma el commit **solo con `git add`** sobre el cambio que ya
+   está en el árbol —archivos completos, o `git add -p` para tomar *hunks*
+   sueltos (si un archivo sin seguimiento hay que repartirlo, `git add -N` y
+   luego `git add -p`)—. **Nunca edites un archivo para dar forma a un commit
+   ni para reconstruir un estado intermedio**: esta skill no toca una sola
+   línea de código. Enseña el mensaje final, `git commit`, y ejecuta su
+   **Comprobación** antes de pasar al siguiente.
 3. Respeta los *trailers* de commit que el entorno de la sesión indique
    (autoría, `Co-Authored-By`, enlace de sesión).
 4. Si una Comprobación falla, **detente**: no sigas con el resto de commits.
@@ -129,6 +133,9 @@ Una vez aprobado, y solo entonces:
 Esta skill reparte y confirma trabajo **ya presente en el árbol**. No:
 
 - escribe código, tests, migraciones ni documentación nueva;
+- edita ningún archivo para armar un commit: cada commit se compone
+  **exclusivamente con `git add`** (completo o `-p`) sobre lo que ya hay en el
+  árbol, sin reescribir ni una línea;
 - arregla una suite que ya estaba en rojo antes de invocarla (dilo y detente);
 - reescribe, reordena (`rebase`) ni fusiona commits ya existentes;
 - hace `push` ni abre PR.
