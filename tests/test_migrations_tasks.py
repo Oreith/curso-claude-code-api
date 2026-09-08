@@ -1,9 +1,7 @@
-"""Migración de la tabla `tasks` (solo esquema), contra el PostgreSQL de Compose.
-
-Comprobación del Incremento 2:
+"""Migraciones de la tabla `tasks`, contra el PostgreSQL de Compose.
 
 - tras `upgrade head`, `tasks` tiene exactamente `id`, `title`, `description`,
-  `project_id` y `state_id` (sin `due_at`), con la nulabilidad correcta;
+  `project_id`, `state_id` y `due_at` (v2), con la nulabilidad correcta;
 - hay una FK `project_id -> projects.id` y otra `state_id -> states.id`, ambas
   con regla de borrado `RESTRICT`;
 - `downgrade` elimina `tasks` sin tocar `projects` ni `states`.
@@ -55,18 +53,43 @@ def base_limpia(engine, alembic_config):
     _reset_base(engine, alembic_config)
 
 
-def test_columnas_de_tasks_sin_due_at(engine, alembic_config):
+def test_columnas_de_tasks(engine, alembic_config):
     command.upgrade(alembic_config, "head")
 
     cols = {c["name"]: c for c in inspect(engine).get_columns("tasks")}
-    assert set(cols) == {"id", "title", "description", "project_id", "state_id"}
+    assert set(cols) == {
+        "id",
+        "title",
+        "description",
+        "project_id",
+        "state_id",
+        "due_at",
+    }
     assert cols["title"]["nullable"] is False
     assert cols["description"]["nullable"] is True
     assert cols["project_id"]["nullable"] is False
     assert cols["state_id"]["nullable"] is False
+    assert cols["due_at"]["nullable"] is True
+    assert "TIMESTAMP" in str(cols["due_at"]["type"]).upper()
 
     pk = tuple(inspect(engine).get_pk_constraint("tasks")["constrained_columns"])
     assert pk == ("id",)
+
+
+def test_downgrade_due_at_conserva_el_resto(engine, alembic_config):
+    command.upgrade(alembic_config, "head")
+    command.downgrade(alembic_config, "-1")  # revierte solo due_at (rollback v2)
+
+    cols = {c["name"] for c in inspect(engine).get_columns("tasks")}
+    assert cols == {"id", "title", "description", "project_id", "state_id"}
+    fks = inspect(engine).get_foreign_keys("tasks")
+    assert {tuple(fk["constrained_columns"]) for fk in fks} == {
+        ("project_id",),
+        ("state_id",),
+    }
+
+    command.upgrade(alembic_config, "head")
+    assert "due_at" in {c["name"] for c in inspect(engine).get_columns("tasks")}
 
 
 def test_claves_foraneas_con_restrict(engine, alembic_config):
@@ -86,12 +109,16 @@ def test_claves_foraneas_con_restrict(engine, alembic_config):
     assert por_columna[("state_id",)]["options"].get("ondelete") == "RESTRICT"
 
 
-def test_downgrade_quita_tasks_y_conserva_projects_y_states(engine, alembic_config):
+def test_downgrade_de_tasks_quita_la_tabla_y_conserva_projects_y_states(
+    engine, alembic_config
+):
     command.upgrade(alembic_config, "head")
-    tablas = set(inspect(engine).get_table_names())
-    assert {"tasks", "projects", "states"} <= tablas
+    assert {"tasks", "projects", "states"} <= set(inspect(engine).get_table_names())
 
+    # Revierte due_at (v2) y luego la creación de tasks, sin ids fijos.
     command.downgrade(alembic_config, "-1")
+    command.downgrade(alembic_config, "-1")
+
     tablas = set(inspect(engine).get_table_names())
     assert "tasks" not in tablas
     assert {"projects", "states"} <= tablas

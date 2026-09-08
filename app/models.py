@@ -3,7 +3,9 @@
 Estas clases no crean ni alteran esquema: solo describen tablas que ya existen.
 """
 
-from sqlalchemy import ForeignKey, Integer, String
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -32,8 +34,8 @@ class Project(Base):
 
 
 class Task(Base):
-    """Tarea v1. Campos del contrato: `id`, `title`, `description` opcional,
-    `project_id`, `state_id`. `due_at` llega en Tareas v2."""
+    """Tarea. Campos del contrato: `id`, `title`, `description` opcional,
+    `project_id`, `state_id`, y `due_at` opcional (v2, en UTC)."""
 
     __tablename__ = "tasks"
 
@@ -45,4 +47,7 @@ class Task(Base):
     )
     state_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("states.id", ondelete="RESTRICT"), nullable=False
+    )
+    due_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
