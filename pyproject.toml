@@ -1,6 +1,6 @@
 [project]
 name = "taskflow-api"
-version = "0.1.0"
+version = "0.3.0"
 description = "API de TaskFlow para el curso"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

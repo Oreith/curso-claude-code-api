@@ -8,6 +8,11 @@ from app.deps import SessionDep
 from app.models import Project
 from app.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 
+# Respuestas de error para las operaciones sobre `/projects/{id}`
+# (docs/contrato-api.md §Convenciones y §Proyectos).
+_404 = {404: {"description": "Proyecto no encontrado"}}
+_404_409 = {**_404, 409: {"description": "El proyecto tiene tareas"}}
+
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
@@ -33,12 +38,12 @@ def list_projects(session: SessionDep) -> list[Project]:
     return list(session.scalars(stmt))
 
 
-@router.get("/{project_id}", response_model=ProjectOut)
+@router.get("/{project_id}", response_model=ProjectOut, responses=_404)
 def get_project(project_id: int, session: SessionDep) -> Project:
     return _get_or_404(session, project_id)
 
 
-@router.patch("/{project_id}", response_model=ProjectOut)
+@router.patch("/{project_id}", response_model=ProjectOut, responses=_404)
 def patch_project(
     project_id: int, payload: ProjectUpdate, session: SessionDep
 ) -> Project:
@@ -51,7 +56,7 @@ def patch_project(
     return project
 
 
-@router.delete("/{project_id}", status_code=204)
+@router.delete("/{project_id}", status_code=204, responses=_404_409)
 def delete_project(project_id: int, session: SessionDep) -> Response:
     project = _get_or_404(session, project_id)
     tiene_tareas = session.scalar(

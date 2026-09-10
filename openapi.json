@@ -107,6 +107,12 @@
         "description": "Estado tal como lo devuelve `GET /states`: `id` y `code`, ni un campo más.",
         "properties": {
           "code": {
+            "enum": [
+              "PENDIENTE",
+              "EN_CURSO",
+              "BLOQUEADA",
+              "HECHA"
+            ],
             "title": "Code",
             "type": "string"
           },
@@ -152,6 +158,11 @@
           "priority": {
             "anyOf": [
               {
+                "enum": [
+                  "BAJA",
+                  "MEDIA",
+                  "ALTA"
+                ],
                 "type": "string"
               },
               {
@@ -214,6 +225,11 @@
           "priority": {
             "anyOf": [
               {
+                "enum": [
+                  "BAJA",
+                  "MEDIA",
+                  "ALTA"
+                ],
                 "type": "string"
               },
               {
@@ -277,6 +293,11 @@
           "priority": {
             "anyOf": [
               {
+                "enum": [
+                  "BAJA",
+                  "MEDIA",
+                  "ALTA"
+                ],
                 "type": "string"
               },
               {
@@ -366,7 +387,7 @@
   },
   "info": {
     "title": "TaskFlow API",
-    "version": "0.1.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -474,6 +495,12 @@
           "204": {
             "description": "Successful Response"
           },
+          "404": {
+            "description": "Proyecto no encontrado"
+          },
+          "409": {
+            "description": "El proyecto tiene tareas"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -513,6 +540,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "Proyecto no encontrado"
           },
           "422": {
             "content": {
@@ -563,6 +593,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "Proyecto no encontrado"
           },
           "422": {
             "content": {
@@ -749,6 +782,9 @@
           "204": {
             "description": "Successful Response"
           },
+          "404": {
+            "description": "Tarea no encontrada"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -788,6 +824,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "Tarea no encontrada"
           },
           "422": {
             "content": {
@@ -838,6 +877,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "Tarea no encontrada"
           },
           "422": {
             "content": {
