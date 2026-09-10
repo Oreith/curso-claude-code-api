@@ -432,7 +432,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Lista los proyectos ordenados por id ascendente",
+        "summary": "List Projects",
         "tags": [
           "projects"
         ]
