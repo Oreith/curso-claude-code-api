@@ -1,22 +1,11 @@
 # TaskFlow API
 
-Base de la API de TaskFlow: FastAPI gestionada con [uv](https://docs.astral.sh/uv/)
-y Python 3.12.
+API de gestión de tareas y proyectos. FastAPI y PostgreSQL, gestionada con
+[uv](https://docs.astral.sh/uv/) y Python 3.12.
 
-## Endpoints
-
-| Ruta | Descripción |
-|---|---|
-| `GET /health` | `200` con `{"status": "ok"}` |
-| `GET /states` | Catálogo cerrado de estados desde PostgreSQL |
-| `POST /projects` · `GET /projects` · `GET /projects/{id}` · `PATCH /projects/{id}` · `DELETE /projects/{id}` | CRUD de proyectos; `DELETE` responde `409` si el proyecto tiene tareas |
-| `POST /tasks` · `GET /tasks` · `GET /tasks/{id}` · `PATCH /tasks/{id}` · `DELETE /tasks/{id}` | CRUD de tareas. `GET /tasks` admite `?project_id=`, `?state_id=` y `?overdue=true`, solos o combinados |
-
-`due_at` es opcional, debe llevar zona horaria y se devuelve siempre en UTC con
-sufijo `Z` y sin microsegundos. `?overdue=true` filtra las tareas con `due_at`
-pasado y estado distinto de `HECHA`.
-
-El comportamiento observable vinculante está en `docs/contrato-api.md`.
+- **Qué expone la API:** `docs/contrato-api.md` (comportamiento observable
+  vinculante: rutas, códigos de estado y esquemas de respuesta).
+- **Peticiones listas para ejecutar:** `api.http`, en la raíz del repositorio.
 
 ## Requisitos
 
@@ -24,44 +13,71 @@ El comportamiento observable vinculante está en `docs/contrato-api.md`.
 - uv.
 - Docker con Compose v2.
 
-## Recorrido
+## Puesta en marcha
+
+Cada línea es un paso; ejecútalos en este orden desde la raíz del repositorio.
 
 ```bash
-# 1. Instalar dependencias exactamente como están fijadas en uv.lock
 uv sync --frozen
-
-# 2. Ejecutar los tests
-uv run pytest -q
-
-# 3. Comprobar el estilo con Ruff
-uv run ruff check .
-
-# 4. Levantar PostgreSQL en segundo plano
+export POSTGRES_USER=taskflow POSTGRES_PASSWORD=taskflow_local POSTGRES_DB=taskflow POSTGRES_HOST=localhost POSTGRES_PORT=5432
 docker compose up -d
-
-# 5. Aplicar las migraciones
+docker compose ps
 uv run alembic upgrade head
-
-# 6. Servir la API en local (http://127.0.0.1:8000)
 uv run uvicorn app.main:app --reload
-
-# 7. Al terminar, parar y retirar los contenedores
-docker compose down
 ```
 
-`GET /health` responde `200` con `{"status": "ok"}`.
+- `export ...` publica las variables `POSTGRES_*` en la shell actual. `alembic`
+  y `uvicorn` construyen la URL de conexión desde ellas (`app/config.py`) y no
+  arrancan si faltan; `docker compose` usa los mismos valores como defaults.
+  Para personalizarlos, copia `.env.example` a `.env`, edítalo, y en lugar del
+  `export` de arriba usa `set -a && source .env && set +a`.
+- `docker compose ps` es una comprobación: espera a que el servicio `db`
+  aparezca como `healthy` antes de migrar.
+- `uv run uvicorn ...` queda en primer plano sirviendo en
+  `http://127.0.0.1:8000`. Se detiene con `Ctrl-C`.
 
-## Configuración
+## Probar un endpoint
 
-`compose.yaml` trae valores locales por defecto, así que arranca sin `.env`. Para
-personalizarlo, copia `.env.example` a `.env` y ajusta `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST` y `POSTGRES_PORT`.
+Con la API en marcha, en otra terminal:
+
+```bash
+curl -s http://127.0.0.1:8000/health
+```
+
+Responde `200` con `{"status": "ok"}`.
+
+Para el recorrido completo —crear un proyecto, sus tareas, filtrar, y los casos
+de error— abre `api.http` con la extensión REST Client de VS Code o el cliente
+HTTP de JetBrains y lanza las peticiones de arriba abajo: cada una se apoya en
+el resultado de la anterior.
+
+## Tests
+
+Los tests de persistencia corren contra el PostgreSQL real de `compose.yaml`,
+no contra SQLite. Con la base levantada (`docker compose up -d`) y `healthy`:
+
+```bash
+uv run pytest -q
+```
+
+`tests/conftest.py` toma las variables `POSTGRES_*` del entorno; si no están,
+carga un `.env` de la raíz (si existe) y, en último caso, usa los valores por
+defecto de `compose.yaml`. Si la base no está disponible, los tests de
+persistencia se marcan como `skipped` en lugar de fallar.
+
+## Estilo
+
+```bash
+uv run ruff check .
+```
+
+Ruff aplica `E, F, I, UP, B` con `line-length = 88`, sin autofix configurado.
 
 ## Migraciones
 
-El esquema de la base se gestiona solo con Alembic. La URL de conexión la
-construye `alembic/env.py` desde las variables `POSTGRES_*` del entorno (las
-mismas de `.env.example`); no está en `alembic.ini`.
+El esquema de la base se gestiona solo con Alembic; la URL de conexión la
+construye `alembic/env.py` desde las variables `POSTGRES_*` del entorno, no
+desde `alembic.ini`.
 
 ```bash
 uv run alembic upgrade head     # aplica todas las migraciones
@@ -69,18 +85,8 @@ uv run alembic downgrade base   # revierte todas las revisiones
 uv run alembic downgrade -1     # revierte solo la última
 ```
 
-## Base de datos para los tests
-
-Los tests de persistencia corren contra el PostgreSQL real de `compose.yaml`, no
-contra SQLite. Antes de `uv run pytest`:
+## Al terminar
 
 ```bash
-docker compose up -d            # levanta el servicio `db`
-docker compose ps               # espera a que aparezca como healthy
+docker compose down       # para y retira los contenedores; conserva el volumen
 ```
-
-`tests/conftest.py` toma las variables `POSTGRES_*` del entorno; si no están,
-carga un `.env` de la raíz (si existe) y, en último caso, usa los valores por
-defecto de `compose.yaml`. Cada test de migraciones deja la base sin tablas al
-empezar y al terminar. Si la base no está disponible, esos tests se marcan como
-`skipped` en lugar de fallar.
