@@ -432,7 +432,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "List Projects",
+        "summary": "Lista los proyectos ordenados por id ascendente",
         "tags": [
           "projects"
         ]
@@ -719,7 +719,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "List Tasks",
+        "summary": "Lista las tareas ordenadas por id, con filtros opcionales",
         "tags": [
           "tasks"
         ]

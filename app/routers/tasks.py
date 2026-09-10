@@ -56,7 +56,11 @@ def create_task(payload: TaskCreate, session: SessionDep) -> Task:
     return task
 
 
-@router.get("", response_model=list[TaskOut])
+@router.get(
+    "",
+    response_model=list[TaskOut],
+    summary="Lista las tareas ordenadas por id, con filtros opcionales",
+)
 def list_tasks(
     session: SessionDep,
     project_id: int | None = None,
