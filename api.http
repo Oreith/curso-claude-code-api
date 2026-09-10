@@ -1,0 +1,224 @@
+# TaskFlow API — recorrido del contrato (docs/contrato-api.md)
+#
+# Las peticiones están en un orden en el que cada una puede apoyarse en el
+# resultado de la anterior: primero se crea lo que las siguientes necesitan.
+# Con la REST Client de VS Code / JetBrains, las variables {{...}} se toman de
+# la respuesta anterior nombrada con "# @name".
+#
+# Requisitos: base levantada y migrada.
+#   docker compose up -d
+#   uv run alembic upgrade head
+#   uv run uvicorn app.main:app
+
+@host = http://127.0.0.1:8000
+
+### Salud — 200 {"status": "ok"}
+GET {{host}}/health
+
+### Estados — catálogo cerrado, ordenado; guarda un state_id para las tareas
+# @name states
+GET {{host}}/states
+
+### Estado de la primera fila del catálogo (PENDIENTE)
+@stateId = {{states.response.body.$[0].id}}
+### Un estado que no sea HECHA, para el caso overdue (segunda fila: EN_CURSO)
+@stateNoHecha = {{states.response.body.$[1].id}}
+### El estado HECHA (cuarta fila del catálogo)
+@stateHecha = {{states.response.body.$[3].id}}
+
+# ─────────────────────────────  PROYECTOS  ─────────────────────────────
+
+### Crear un proyecto — 201; guarda su id
+# @name proyecto
+POST {{host}}/projects
+Content-Type: application/json
+
+{
+  "name": "Casa",
+  "description": "Tareas del hogar"
+}
+
+###
+@projectId = {{proyecto.response.body.id}}
+
+### Crear un segundo proyecto — se borrará al final (no tendrá tareas)
+# @name proyectoBorrable
+POST {{host}}/projects
+Content-Type: application/json
+
+{
+  "name": "Proyecto efímero"
+}
+
+###
+@projectBorrableId = {{proyectoBorrable.response.body.id}}
+
+### Listar proyectos — 200, lista JSON en la raíz, orden por id ascendente
+GET {{host}}/projects
+
+### Leer un proyecto por id — 200, esquema exacto {id, name, description}
+GET {{host}}/projects/{{projectId}}
+
+### Actualización parcial — 200; solo cambia description, name intacto
+PATCH {{host}}/projects/{{projectId}}
+Content-Type: application/json
+
+{
+  "description": "Tareas del hogar y el jardín"
+}
+
+### ERROR proyecto — id inexistente — 404 {"detail": ...}
+GET {{host}}/projects/999999
+
+### ERROR proyecto — validación falla: name en blanco — 422, clave raíz detail
+POST {{host}}/projects
+Content-Type: application/json
+
+{
+  "name": "   "
+}
+
+# ──────────────────────────  TAREAS v1 y v2  ──────────────────────────
+
+### Crear una tarea (v1: sin due_at) — 201; valida proyecto, estado y título
+# @name tarea
+POST {{host}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Regar las plantas",
+  "description": "Cada dos días",
+  "project_id": {{projectId}},
+  "state_id": {{stateId}}
+}
+
+###
+@taskId = {{tarea.response.body.id}}
+
+### Crear una tarea v2 con due_at (offset) — 201; se devuelve en UTC con Z
+# @name tareaConFecha
+POST {{host}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Entregar informe",
+  "project_id": {{projectId}},
+  "state_id": {{stateNoHecha}},
+  "due_at": "2026-03-01T11:00:00+02:00"
+}
+
+###
+@taskConFechaId = {{tareaConFecha.response.body.id}}
+
+### Crear una tarea vencida y no HECHA — sirve para overdue=true
+POST {{host}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarea atrasada",
+  "project_id": {{projectId}},
+  "state_id": {{stateNoHecha}},
+  "due_at": "2020-01-01T00:00:00Z"
+}
+
+### Crear una tarea vencida pero HECHA — NO debe aparecer en overdue=true
+POST {{host}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarea atrasada pero terminada",
+  "project_id": {{projectId}},
+  "state_id": {{stateHecha}},
+  "due_at": "2020-01-01T00:00:00Z"
+}
+
+### Listar tareas — 200, lista JSON en la raíz, orden por id ascendente
+GET {{host}}/tasks
+
+### Listar filtrando por project_id
+GET {{host}}/tasks?project_id={{projectId}}
+
+### Listar filtrando por state_id
+GET {{host}}/tasks?state_id={{stateId}}
+
+### Listar con filtros combinados (project_id + state_id)
+GET {{host}}/tasks?project_id={{projectId}}&state_id={{stateId}}
+
+### Filtro sin coincidencias — 200 con lista vacía, no 404
+GET {{host}}/tasks?project_id=999999
+
+### Vencidas — overdue=true; solo due_at pasado y estado distinto de HECHA
+GET {{host}}/tasks?overdue=true
+
+### overdue combinado con project_id
+GET {{host}}/tasks?overdue=true&project_id={{projectId}}
+
+### Leer una tarea por id — 200, esquema exacto
+GET {{host}}/tasks/{{taskId}}
+
+### Actualización parcial consistente — 200; solo cambia el estado
+PATCH {{host}}/tasks/{{taskId}}
+Content-Type: application/json
+
+{
+  "state_id": {{stateNoHecha}}
+}
+
+### Fijar y luego quitar due_at con null explícito — 200
+PATCH {{host}}/tasks/{{taskId}}
+Content-Type: application/json
+
+{
+  "due_at": null
+}
+
+### ERROR tarea — id inexistente — 404 {"detail": ...}
+GET {{host}}/tasks/999999
+
+### ERROR tarea — validación falla: título sin carácter visible — 422
+POST {{host}}/tasks
+Content-Type: application/json
+
+{
+  "title": "   ",
+  "project_id": {{projectId}},
+  "state_id": {{stateId}}
+}
+
+### ERROR tarea — proyecto inexistente al crear — 422
+POST {{host}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Sin proyecto válido",
+  "project_id": 999999,
+  "state_id": {{stateId}}
+}
+
+### ERROR tarea — due_at sin zona horaria — 422
+POST {{host}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Fecha ambigua",
+  "project_id": {{projectId}},
+  "state_id": {{stateId}},
+  "due_at": "2026-03-01T09:00:00"
+}
+
+### ERROR tarea — overdue con valor no admitido — 422
+GET {{host}}/tasks?overdue=TRUE
+
+# ──────────────────────────  BORRADOS Y 409  ──────────────────────────
+
+### ERROR proyecto — 409 al borrar un proyecto que tiene tareas
+DELETE {{host}}/projects/{{projectId}}
+
+### Borrar una tarea — 204 sin cuerpo
+DELETE {{host}}/tasks/{{taskId}}
+
+### Borrar la tarea con fecha — 204 sin cuerpo
+DELETE {{host}}/tasks/{{taskConFechaId}}
+
+### Borrar un proyecto sin tareas — 204 sin cuerpo
+DELETE {{host}}/projects/{{projectBorrableId}}

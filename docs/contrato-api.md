@@ -14,8 +14,12 @@ abierta salvo las restricciones de seguridad, migración y verificación.
 - Errores con forma estable: `{"detail": "<mensaje>"}`, donde el mensaje es una
   cadena legible. Para un `422` de validación se admite además la forma que
   genere tu framework, siempre que la clave de primer nivel siga siendo
-  `detail`.
+  `detail`. El valor de `detail` puede entonces ser una lista en lugar de una
+  cadena; un consumidor solo debe apoyarse en la presencia de la clave
+  `detail`, no en su tipo.
 - Una referencia a proyecto o estado inexistente no se crea implícitamente.
+- Los campos de texto libre (`name`, `title`, `description`) no tienen longitud
+  máxima: ningún valor se rechaza por largo.
 
 ### Normalización de texto
 
@@ -105,6 +109,9 @@ Campos: `id`, `title`, `description` opcional, `project_id`, `state_id`.
 | `GET /tasks/{id}` | `200`, o `404` si no existe |
 | `PATCH /tasks/{id}` | `200` con actualización parcial consistente |
 | `DELETE /tasks/{id}` | `204` sin cuerpo |
+
+Un filtro que no casa con ninguna fila devuelve `200` con una lista vacía, no
+`404`: `404` queda para un recurso ausente en la ruta, no en la query.
 
 ## Tareas v2: Fechas Límite
 
