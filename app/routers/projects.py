@@ -32,7 +32,11 @@ def create_project(payload: ProjectCreate, session: SessionDep) -> Project:
     return project
 
 
-@router.get("", response_model=list[ProjectOut])
+@router.get(
+    "",
+    response_model=list[ProjectOut],
+    summary="Lista los proyectos ordenados por id ascendente",
+)
 def list_projects(session: SessionDep) -> list[Project]:
     stmt = select(Project).order_by(Project.id)
     return list(session.scalars(stmt))
