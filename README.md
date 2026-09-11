@@ -73,6 +73,16 @@ uv run ruff check .
 
 Ruff aplica `E, F, I, UP, B` con `line-length = 88`, sin autofix configurado.
 
+## Especificación OpenAPI
+
+FastAPI la genera y la sirve en `GET /openapi.json` (UI en `/docs` y `/redoc`).
+`openapi.json`, en la raíz, es una copia versionada; se regenera sin servidor ni
+base de datos con:
+
+```bash
+uv run python -c "import json; from app.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2, sort_keys=True))" > openapi.json
+```
+
 ## Migraciones
 
 El esquema de la base se gestiona solo con Alembic; la URL de conexión la

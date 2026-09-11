@@ -10,10 +10,11 @@ from app.deps import SessionDep
 from app.models import Project, State, Task
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 
-router = APIRouter(prefix="/tasks", tags=["tasks"])
+# Respuesta de error para las operaciones sobre `/tasks/{id}`
+# (docs/contrato-api.md §Convenciones: `404` para recurso inexistente).
+_404 = {404: {"description": "Tarea no encontrada"}}
 
-# Conjunto cerrado de prioridades (docs/contrato-api.md §Tareas v3).
-_PRIORIDADES = {"BAJA", "MEDIA", "ALTA"}
+router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 def _task_o_404(session: Session, task_id: int) -> Task:
@@ -37,19 +38,10 @@ def _valida_state_id(session: Session, state_id: int) -> None:
         )
 
 
-def _valida_priority(value: str | None) -> None:
-    if value is not None and value not in _PRIORIDADES:
-        raise HTTPException(
-            status_code=422,
-            detail="priority debe ser uno de BAJA, MEDIA o ALTA",
-        )
-
-
 @router.post("", response_model=TaskOut, status_code=201)
 def create_task(payload: TaskCreate, session: SessionDep) -> Task:
     _valida_project_id(session, payload.project_id)
     _valida_state_id(session, payload.state_id)
-    _valida_priority(payload.priority)
     task = Task(
         title=payload.title,
         description=payload.description,
@@ -64,7 +56,11 @@ def create_task(payload: TaskCreate, session: SessionDep) -> Task:
     return task
 
 
-@router.get("", response_model=list[TaskOut])
+@router.get(
+    "",
+    response_model=list[TaskOut],
+    summary="Lista las tareas ordenadas por id, con filtros opcionales",
+)
 def list_tasks(
     session: SessionDep,
     project_id: int | None = None,
@@ -87,12 +83,12 @@ def list_tasks(
     return list(session.scalars(stmt))
 
 
-@router.get("/{task_id}", response_model=TaskOut)
+@router.get("/{task_id}", response_model=TaskOut, responses=_404)
 def get_task(task_id: int, session: SessionDep) -> Task:
     return _task_o_404(session, task_id)
 
 
-@router.patch("/{task_id}", response_model=TaskOut)
+@router.patch("/{task_id}", response_model=TaskOut, responses=_404)
 def patch_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
     task = _task_o_404(session, task_id)
     cambios = payload.model_dump(exclude_unset=True)
@@ -100,8 +96,6 @@ def patch_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
         _valida_project_id(session, cambios["project_id"])
     if "state_id" in cambios:
         _valida_state_id(session, cambios["state_id"])
-    if "priority" in cambios:
-        _valida_priority(cambios["priority"])
     for campo, valor in cambios.items():
         setattr(task, campo, valor)
     session.commit()
@@ -109,7 +103,7 @@ def patch_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
     return task
 
 
-@router.delete("/{task_id}", status_code=204)
+@router.delete("/{task_id}", status_code=204, responses=_404)
 def delete_task(task_id: int, session: SessionDep) -> Response:
     task = _task_o_404(session, task_id)
     session.delete(task)

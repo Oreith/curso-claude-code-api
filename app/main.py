@@ -1,5 +1,7 @@
+import tomllib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from sqlalchemy import select
@@ -22,7 +24,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine.dispose()
 
 
-app = FastAPI(title="TaskFlow API", lifespan=lifespan)
+def _version() -> str:
+    """Versión declarada en `pyproject.toml` (el paquete no se instala como dist)."""
+    datos = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text())
+    return datos["project"]["version"]
+
+
+app = FastAPI(title="TaskFlow API", version=_version(), lifespan=lifespan)
 app.include_router(projects.router)
 app.include_router(tasks.router)
 
@@ -32,7 +40,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/states", response_model=list[StateOut])
+@app.get(
+    "/states",
+    response_model=list[StateOut],
+    summary="Lista el catálogo cerrado de estados, en su orden",
+)
 def list_states(session: SessionDep) -> list[State]:
     stmt = select(State).order_by(State.position, State.id)
     return list(session.scalars(stmt))

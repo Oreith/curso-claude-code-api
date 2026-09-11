@@ -2,11 +2,17 @@
 
 import unicodedata
 from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 # Categorías Unicode sin carácter visible (docs/contrato-api.md §Normalización).
 _CATEGORIAS_INVISIBLES = {"Cc", "Cf", "Zl", "Zp", "Zs"}
+
+# Conjuntos cerrados del contrato, declarados para que salgan como `enum` en
+# OpenAPI (docs/contrato-api.md §Estados y §Tareas v3).
+StateCode = Literal["PENDIENTE", "EN_CURSO", "BLOQUEADA", "HECHA"]
+Priority = Literal["BAJA", "MEDIA", "ALTA"]
 
 
 def _due_at_utc(value: datetime | None) -> datetime | None:
@@ -35,7 +41,7 @@ class StateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: int
-    code: str
+    code: StateCode
 
 
 def _titulo_normalizado(value: str) -> str:
@@ -112,7 +118,7 @@ class TaskCreate(BaseModel):
     project_id: int
     state_id: int
     due_at: datetime | None = None
-    priority: str | None = None
+    priority: Priority | None = None
 
     _valida_title = field_validator("title")(_titulo_normalizado)
     _valida_due_at = field_validator("due_at")(_due_at_utc)
@@ -134,7 +140,7 @@ class TaskUpdate(BaseModel):
     project_id: int | None = None
     state_id: int | None = None
     due_at: datetime | None = None
-    priority: str | None = None
+    priority: Priority | None = None
 
     @field_validator("title")
     @classmethod
@@ -161,7 +167,7 @@ class TaskOut(BaseModel):
     project_id: int
     state_id: int
     due_at: datetime | None
-    priority: str | None
+    priority: Priority | None
 
     @field_serializer("due_at")
     def _serializa_due_at(self, value: datetime | None) -> str | None:
