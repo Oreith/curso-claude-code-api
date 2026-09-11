@@ -38,6 +38,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/tras-editar-especificacion.sh\"",
+            "timeout": 20,
+            "statusMessage": "Regenerando openapi.json"
+          }
+        ]
+      }
     ]
   }
 }
