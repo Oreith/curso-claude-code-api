@@ -633,7 +633,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "List States"
+        "summary": "Lista el catálogo cerrado de estados, en su orden"
       }
     },
     "/tasks": {

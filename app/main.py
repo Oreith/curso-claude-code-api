@@ -40,7 +40,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/states", response_model=list[StateOut])
+@app.get(
+    "/states",
+    response_model=list[StateOut],
+    summary="Lista el catálogo cerrado de estados, en su orden",
+)
 def list_states(session: SessionDep) -> list[State]:
     stmt = select(State).order_by(State.position, State.id)
     return list(session.scalars(stmt))
