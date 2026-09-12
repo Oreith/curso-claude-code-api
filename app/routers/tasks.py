@@ -2,11 +2,11 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Response
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 from app.deps import SessionDep
+from app.errors import get_or_404, valida_referencia
 from app.models import Project, State, Task
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 
@@ -17,31 +17,17 @@ _404 = {404: {"description": "Tarea no encontrada"}}
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-def _task_o_404(session: Session, task_id: int) -> Task:
-    task = session.get(Task, task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Tarea no encontrada")
-    return task
-
-
-def _valida_project_id(session: Session, project_id: int) -> None:
-    if session.get(Project, project_id) is None:
-        raise HTTPException(
-            status_code=422, detail="project_id no corresponde a ningún proyecto"
-        )
-
-
-def _valida_state_id(session: Session, state_id: int) -> None:
-    if session.get(State, state_id) is None:
-        raise HTTPException(
-            status_code=422, detail="state_id no corresponde a ningún estado"
-        )
-
-
 @router.post("", response_model=TaskOut, status_code=201)
 def create_task(payload: TaskCreate, session: SessionDep) -> Task:
-    _valida_project_id(session, payload.project_id)
-    _valida_state_id(session, payload.state_id)
+    valida_referencia(
+        session,
+        Project,
+        payload.project_id,
+        "project_id no corresponde a ningún proyecto",
+    )
+    valida_referencia(
+        session, State, payload.state_id, "state_id no corresponde a ningún estado"
+    )
     task = Task(
         title=payload.title,
         description=payload.description,
@@ -85,17 +71,27 @@ def list_tasks(
 
 @router.get("/{task_id}", response_model=TaskOut, responses=_404)
 def get_task(task_id: int, session: SessionDep) -> Task:
-    return _task_o_404(session, task_id)
+    return get_or_404(session, Task, task_id, "Tarea no encontrada")
 
 
 @router.patch("/{task_id}", response_model=TaskOut, responses=_404)
 def patch_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
-    task = _task_o_404(session, task_id)
+    task = get_or_404(session, Task, task_id, "Tarea no encontrada")
     cambios = payload.model_dump(exclude_unset=True)
     if "project_id" in cambios:
-        _valida_project_id(session, cambios["project_id"])
+        valida_referencia(
+            session,
+            Project,
+            cambios["project_id"],
+            "project_id no corresponde a ningún proyecto",
+        )
     if "state_id" in cambios:
-        _valida_state_id(session, cambios["state_id"])
+        valida_referencia(
+            session,
+            State,
+            cambios["state_id"],
+            "state_id no corresponde a ningún estado",
+        )
     for campo, valor in cambios.items():
         setattr(task, campo, valor)
     session.commit()
@@ -105,7 +101,7 @@ def patch_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
 
 @router.delete("/{task_id}", status_code=204, responses=_404)
 def delete_task(task_id: int, session: SessionDep) -> Response:
-    task = _task_o_404(session, task_id)
+    task = get_or_404(session, Task, task_id, "Tarea no encontrada")
     session.delete(task)
     session.commit()
     return Response(status_code=204)
