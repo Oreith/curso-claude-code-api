@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import select, text
-from sqlalchemy.orm import Session
 
 from app.deps import SessionDep
+from app.errors import get_or_404
 from app.models import Project
 from app.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 
@@ -14,13 +14,6 @@ _404 = {404: {"description": "Proyecto no encontrado"}}
 _404_409 = {**_404, 409: {"description": "El proyecto tiene tareas"}}
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-
-def _get_or_404(session: Session, project_id: int) -> Project:
-    project = session.get(Project, project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-    return project
 
 
 @router.post("", response_model=ProjectOut, status_code=201)
@@ -40,14 +33,14 @@ def list_projects(session: SessionDep) -> list[Project]:
 
 @router.get("/{project_id}", response_model=ProjectOut, responses=_404)
 def get_project(project_id: int, session: SessionDep) -> Project:
-    return _get_or_404(session, project_id)
+    return get_or_404(session, Project, project_id, "Proyecto no encontrado")
 
 
 @router.patch("/{project_id}", response_model=ProjectOut, responses=_404)
 def patch_project(
     project_id: int, payload: ProjectUpdate, session: SessionDep
 ) -> Project:
-    project = _get_or_404(session, project_id)
+    project = get_or_404(session, Project, project_id, "Proyecto no encontrado")
     cambios = payload.model_dump(exclude_unset=True)
     for campo, valor in cambios.items():
         setattr(project, campo, valor)
@@ -58,7 +51,7 @@ def patch_project(
 
 @router.delete("/{project_id}", status_code=204, responses=_404_409)
 def delete_project(project_id: int, session: SessionDep) -> Response:
-    project = _get_or_404(session, project_id)
+    project = get_or_404(session, Project, project_id, "Proyecto no encontrado")
     tiene_tareas = session.scalar(
         text("SELECT 1 FROM tasks WHERE project_id = :pid LIMIT 1"),
         {"pid": project_id},
