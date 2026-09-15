@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  POSTGRES_USER: taskflow_ci
+  POSTGRES_PASSWORD: taskflow_ci
+  POSTGRES_DB: taskflow_ci
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: 5432
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: taskflow_ci
+          POSTGRES_PASSWORD: taskflow_ci
+          POSTGRES_DB: taskflow_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U taskflow_ci -d taskflow_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Descarga el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instala uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Instala las dependencias fijadas
+        run: uv sync --frozen
+
+      - name: Espera a que PostgreSQL esté disponible
+        run: |
+          for i in $(seq 1 30); do
+            if uv run python -c "
+          import sys
+          from sqlalchemy import create_engine, text
+          from app.config import build_database_url
+          try:
+              create_engine(build_database_url()).connect().close()
+          except Exception:
+              sys.exit(1)
+          "; then
+              echo "PostgreSQL disponible."
+              exit 0
+            fi
+            echo "PostgreSQL no responde aún (intento $i/30)…"
+            sleep 2
+          done
+          echo "PostgreSQL no respondió a tiempo." >&2
+          exit 1
+
+      - name: Aplica las migraciones
+        run: uv run alembic upgrade head
+
+      - name: Ejecuta la suite
+        run: uv run pytest -q
+
+      - name: Ejecuta el linter
+        run: uv run ruff check .
+
+      - name: Comprueba que openapi.json está al día
+        run: |
+          uv run python -c "import json; from app.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2, sort_keys=True))" > /tmp/openapi_actual.json
+          diff /tmp/openapi_actual.json openapi.json
+
+      - name: Reaplica las migraciones tras la suite
+        # tests/test_migrations_cycle.py ejercita upgrade/downgrade y deja la
+        # base en "downgrade base" (esquema vacío) al terminar: hace falta
+        # volver a "head" antes de arrancar la API contra esta misma base.
+        run: uv run alembic upgrade head
+
+      - name: Arranca la API en el puerto 8000
+        run: |
+          uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            > api.log 2>&1 &
+          echo $! > api.pid
+
+      - name: Espera a que la API responda
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+              echo "API disponible."
+              exit 0
+            fi
+            echo "API no responde aún (intento $i/30)…"
+            sleep 1
+          done
+          echo "La API no respondió a tiempo." >&2
+          exit 1
+
+      - name: Comprueba GET /states contra PostgreSQL real
+        run: |
+          resp="$(curl -s -w '\n%{http_code}' http://127.0.0.1:8000/states)"
+          codigo="$(echo "$resp" | tail -n1)"
+          cuerpo="$(echo "$resp" | sed '$d')"
+          echo "Código: $codigo"
+          echo "Cuerpo: $cuerpo"
+          if [ "$codigo" != "200" ]; then
+            echo "Esperaba 200, recibí $codigo" >&2
+            exit 1
+          fi
+          echo "$cuerpo" | uv run python -c "
+          import json, sys
+          cuerpo = json.load(sys.stdin)
+          esperado = ['PENDIENTE', 'EN_CURSO', 'BLOQUEADA', 'HECHA']
+          codigos = [fila['code'] for fila in cuerpo]
+          assert codigos == esperado, f'catálogo inesperado: {codigos}'
+          for fila in cuerpo:
+              assert set(fila.keys()) == {'id', 'code'}, f'esquema inesperado: {fila}'
+          print('GET /states: esquema y catálogo coinciden con el contrato.')
+          "
+
+      - name: Muestra los registros de la API si algo falló
+        if: failure()
+        run: cat api.log || true
+
+      - name: Termina el proceso de la API
+        if: always()
+        run: |
+          if [ -f api.pid ]; then
+            kill "$(cat api.pid)" 2>/dev/null || true
+          fi

@@ -130,7 +130,8 @@ class TaskUpdate(BaseModel):
     Solo se modifican los campos presentes. `title`, si viene, se normaliza y no
     puede quedar sin carácter visible. `description`, `due_at` y `priority`
     admiten `null` explícito; `due_at`, si viene con valor, debe llevar zona
-    horaria.
+    horaria. `project_id` y `state_id` son obligatorios en el recurso (igual
+    que en `POST`): si vienen en el cuerpo, no pueden ser `null`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -148,6 +149,20 @@ class TaskUpdate(BaseModel):
         if value is None:
             return None
         return _titulo_normalizado(value)
+
+    @field_validator("project_id")
+    @classmethod
+    def _valida_project_id(cls, value: int | None) -> int | None:
+        if value is None:
+            raise ValueError("project_id no puede ponerse a null")
+        return value
+
+    @field_validator("state_id")
+    @classmethod
+    def _valida_state_id(cls, value: int | None) -> int | None:
+        if value is None:
+            raise ValueError("state_id no puede ponerse a null")
+        return value
 
     _valida_due_at = field_validator("due_at")(_due_at_utc)
 

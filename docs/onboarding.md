@@ -7,6 +7,11 @@ razonadas) y **Desconocidos** (sin evidencia).
 Estado a fecha 2026-08-28: rama `main`, dos commits, solo `GET /health`
 implementado.
 
+> **Nota (2026-09-15)**: las decisiones que la §5 original listaba como
+> abiertas ya están tomadas en el código; ver el aviso al principio de esa
+> sección. El resto del documento describe el estado de arranque del
+> proyecto y sigue siendo válido como contexto histórico.
+
 ---
 
 ## 1. Fuente de verdad del comportamiento
@@ -183,32 +188,40 @@ implementado.
 
 ## 5. Decisiones que no puedo establecer con evidencia
 
-Requieren confirmación antes de implementar:
+> **Ya no están abiertas** (actualizado 2026-09-15). En el momento en que se
+> escribió esta sección, ninguna tenía evidencia en el repo; hoy sí. Se deja
+> la pregunta original y la resolución que muestra el código actual, en vez
+> de borrar la sección, para que quede constancia de qué se decidió y dónde
+> verificarlo — pero para el estado de la persistencia, la fuente ya no es
+> este documento: es `app/models.py`, `app/config.py` y `alembic/versions/`
+> directamente.
 
-1. **Herramienta de migraciones**: el contrato exige migraciones con
-   `upgrade`/rollback (`docs/contrato-api.md:73-77`, `:163`) pero no hay ninguna
-   dependencia ni configuración. ¿Alembic?
-2. **Capa de persistencia / ORM**: sin dependencia declarada
-   (`pyproject.toml:7-10`). ¿SQLAlchemy 2.x? ¿SQLModel? ¿sync o async?
-3. **Driver de PostgreSQL**: `psycopg` (v3) vs `asyncpg`. Sin evidencia.
-4. **Estrategia de test de persistencia**: base dedicada de test, aislamiento por
-   transacción/rollback, o contenedor efímero. Sin evidencia.
+1. **Herramienta de migraciones**: ¿Alembic? — **Sí.** Ver `alembic/versions/`
+   y `alembic.ini`.
+2. **Capa de persistencia / ORM**: ¿SQLAlchemy 2.x? ¿SQLModel? ¿sync o async?
+   — **SQLAlchemy 2.x**, estilo `DeclarativeBase`, síncrono. Ver
+   `app/models.py`.
+3. **Driver de PostgreSQL**: `psycopg` (v3) vs `asyncpg`. — **`psycopg`
+   (v3)**, síncrono. Ver `app/config.py` (`DRIVER = "postgresql+psycopg"`).
+4. **Estrategia de test de persistencia**: base dedicada, transacción/rollback,
+   o contenedor efímero. — **PostgreSQL real de `compose.yaml`**, con
+   `TRUNCATE` entre tests (no contenedor efímero ni SQLite). Ver
+   `tests/conftest.py` y los `tests/test_*_crud.py` / `tests/test_migrations_*.py`.
 5. **`glosario.md` faltante**: `docs/contrato-api.md:79` enlaza
    `../docs/glosario.md#idempotente` que no existe. ¿Crearlo, o corregir el
-   enlace?
+   enlace? — **Sin resolver**; no verificado en esta actualización.
 6. **`.env` en el working tree**: existe una copia igual a `.env.example`. ¿Se
-   deja (conveniencia local) o se elimina para forzar el flujo "copia el
-   example"?
-7. **Ejecución de la API en Docker**: `compose.yaml` solo define `db`. ¿La API se
-   ejecuta siempre en host con uvicorn, o se añadirá un servicio `api` al compose?
-8. **Framework de la forma `422`**: el contrato admite "la forma que genere tu
-   framework" con clave raíz `detail` (`docs/contrato-api.md:14-17`). Con FastAPI
-   el `422` por defecto es una lista bajo `detail` — asumir que se acepta tal
-   cual, pero conviene confirmarlo.
-9. **Seed del catálogo de estados**: el catálogo
-   (`PENDIENTE, EN_CURSO, BLOQUEADA, HECHA`, `docs/contrato-api.md:58`) se siembra
-   en una migración idempotente; falta decidir la técnica (`INSERT ... ON
-   CONFLICT` u otra).
-10. **Normalización de `due_at`**: el contrato la fija (UTC, sufijo `Z`, sin
-    microsegundos — `docs/contrato-api.md:144-148`); la decisión abierta es
-    *dónde* se aplica (serializador Pydantic vs. capa de repositorio).
+   deja o se elimina? — **Sin resolver**; no verificado en esta actualización.
+7. **Ejecución de la API en Docker**: `compose.yaml` solo define `db`. ¿La API
+   se ejecuta siempre en host con uvicorn? — **Sí**, sigue siendo así:
+   `compose.yaml` solo define `db`; la API se sirve con `uv run uvicorn` en
+   host (`README.md`).
+8. **Framework de la forma `422`**: ¿el `422` por defecto de FastAPI (lista
+   bajo `detail`) se acepta tal cual? — **Sí**, es la forma que usan los
+   tests y el contrato (`{"detail": ...}`).
+9. **Seed del catálogo de estados**: técnica de siembra idempotente. —
+   **Migración de Alembic** con inserción idempotente del catálogo cerrado.
+   Ver la migración que crea `states` en `alembic/versions/`.
+10. **Normalización de `due_at`**: ¿dónde se aplica, serializador Pydantic vs.
+    capa de repositorio? — **En el esquema Pydantic** (`app/schemas.py`,
+    `_due_at_utc`/`_due_at_z`), no en el modelo ni en un repositorio aparte.

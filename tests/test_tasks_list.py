@@ -141,3 +141,19 @@ def test_filtro_sin_coincidencias_200_lista_vacia(client, estados):
     resp = client.get("/tasks?project_id=9999")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+def test_filtro_state_id_sin_coincidencias_200_lista_vacia(client, estados):
+    p = _proyecto(client, "Casa")
+    _tarea(client, p, estados[0])
+    resp = client.get("/tasks?state_id=9999")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_filtros_combinados_sin_coincidencias_200_lista_vacia(client, estados):
+    p = _proyecto(client, "Casa")
+    _tarea(client, p, estados[0])
+    resp = client.get(f"/tasks?project_id={p}&state_id=9999")
+    assert resp.status_code == 200
+    assert resp.json() == []

@@ -105,6 +105,15 @@ def test_post_con_description(client, proyecto_id, estado_id):
     assert resp.json()["description"] == "con la manguera"
 
 
+def test_post_description_solo_espacios_no_se_normaliza(client, proyecto_id, estado_id):
+    # A diferencia de title, description no tiene recorte ni rechazo de
+    # blancos (docs/contrato-api.md §Convenciones: sin longitud mínima ni
+    # máxima para los campos de texto libre). Se guarda tal cual.
+    resp = _crear(client, proyecto_id, estado_id, description="   ")
+    assert resp.status_code == 201
+    assert resp.json()["description"] == "   "
+
+
 def test_post_recorta_el_title(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id, title="  Regar  ").json()
     assert creada["title"] == "Regar"
@@ -183,6 +192,33 @@ def test_patch_cuerpo_vacio_200_sin_cambios(client, proyecto_id, estado_id):
     assert resp.json() == creada
 
 
+def test_patch_multiples_campos_a_la_vez(
+    client, proyecto_id, estado_id, otro_estado_id
+):
+    # Actualización parcial consistente con más de un campo a la vez
+    # (docs/contrato-api.md §Tareas v1), combinando v1 (title, state_id) con
+    # v2 (due_at) y v3 (priority) en el mismo PATCH.
+    creada = _crear(client, proyecto_id, estado_id, description="x").json()
+    resp = client.patch(
+        f"/tasks/{creada['id']}",
+        json={
+            "title": "Regar de nuevo",
+            "state_id": otro_estado_id,
+            "due_at": "2030-01-01T00:00:00+00:00",
+            "priority": "ALTA",
+        },
+    )
+    assert resp.status_code == 200
+    cuerpo = resp.json()
+    assert cuerpo["title"] == "Regar de nuevo"
+    assert cuerpo["state_id"] == otro_estado_id
+    assert cuerpo["due_at"] == "2030-01-01T00:00:00Z"
+    assert cuerpo["priority"] == "ALTA"
+    # lo no enviado no se toca
+    assert cuerpo["project_id"] == creada["project_id"]
+    assert cuerpo["description"] == creada["description"]
+
+
 def test_patch_description_a_null(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id, description="x").json()
     resp = client.patch(f"/tasks/{creada['id']}", json={"description": None})
@@ -215,6 +251,23 @@ def test_patch_state_id_inexistente_422(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id).json()
     resp = client.patch(f"/tasks/{creada['id']}", json={"state_id": 9999})
     assert resp.status_code == 422
+
+
+def test_patch_project_id_null_422(client, proyecto_id, estado_id):
+    # project_id es obligatorio en el recurso (docs/contrato-api.md §Tareas
+    # v1): a diferencia de description/due_at/priority, un PATCH no puede
+    # ponerlo a null.
+    creada = _crear(client, proyecto_id, estado_id).json()
+    resp = client.patch(f"/tasks/{creada['id']}", json={"project_id": None})
+    assert resp.status_code == 422
+    assert "detail" in resp.json()
+
+
+def test_patch_state_id_null_422(client, proyecto_id, estado_id):
+    creada = _crear(client, proyecto_id, estado_id).json()
+    resp = client.patch(f"/tasks/{creada['id']}", json={"state_id": None})
+    assert resp.status_code == 422
+    assert "detail" in resp.json()
 
 
 def test_patch_id_inexistente_404(client):

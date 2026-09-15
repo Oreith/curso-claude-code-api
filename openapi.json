@@ -265,7 +265,7 @@
       },
       "TaskUpdate": {
         "additionalProperties": false,
-        "description": "Cuerpo de `PATCH /tasks/{id}`: actualización parcial consistente.\n\nSolo se modifican los campos presentes. `title`, si viene, se normaliza y no\npuede quedar sin carácter visible. `description`, `due_at` y `priority`\nadmiten `null` explícito; `due_at`, si viene con valor, debe llevar zona\nhoraria.",
+        "description": "Cuerpo de `PATCH /tasks/{id}`: actualización parcial consistente.\n\nSolo se modifican los campos presentes. `title`, si viene, se normaliza y no\npuede quedar sin carácter visible. `description`, `due_at` y `priority`\nadmiten `null` explícito; `due_at`, si viene con valor, debe llevar zona\nhoraria. `project_id` y `state_id` son obligatorios en el recurso (igual\nque en `POST`): si vienen en el cuerpo, no pueden ser `null`.",
         "properties": {
           "description": {
             "anyOf": [
