@@ -69,6 +69,12 @@
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/tras-editar-especificacion.sh\"",
             "timeout": 20,
             "statusMessage": "Regenerando openapi.json"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/coleccion-postman-vieja.sh\"",
+            "timeout": 10,
+            "statusMessage": "Comprobando si la colección de Postman quedó vieja"
           }
         ]
       }
