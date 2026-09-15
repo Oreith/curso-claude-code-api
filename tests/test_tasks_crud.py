@@ -105,6 +105,15 @@ def test_post_con_description(client, proyecto_id, estado_id):
     assert resp.json()["description"] == "con la manguera"
 
 
+def test_post_description_solo_espacios_no_se_normaliza(client, proyecto_id, estado_id):
+    # A diferencia de title, description no tiene recorte ni rechazo de
+    # blancos (docs/contrato-api.md §Convenciones: sin longitud mínima ni
+    # máxima para los campos de texto libre). Se guarda tal cual.
+    resp = _crear(client, proyecto_id, estado_id, description="   ")
+    assert resp.status_code == 201
+    assert resp.json()["description"] == "   "
+
+
 def test_post_recorta_el_title(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id, title="  Regar  ").json()
     assert creada["title"] == "Regar"
