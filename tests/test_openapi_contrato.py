@@ -9,6 +9,9 @@ seed, formato exacto de `due_at`, semántica de `overdue`) quedan fuera.
 `app.openapi()` es una función pura: no abre conexión ni necesita la base.
 """
 
+import json
+from pathlib import Path
+
 from app.main import app
 
 _ESQUEMA = app.openapi()
@@ -54,3 +57,16 @@ def test_get_por_id_declara_404():
 def test_delete_project_declara_409():
     respuestas = _PATHS["/projects/{project_id}"]["delete"]["responses"]
     assert "409" in respuestas
+
+
+def test_openapi_json_coincide_con_el_codigo():
+    # El hook de sesión (.claude/hooks/openapi-al-dia.sh) bloquea el commit
+    # si openapi.json no coincide, pero eso solo protege commits hechos a
+    # través de Claude Code. Este test lo protege también en CI y para
+    # cualquier otro flujo de commit.
+    ruta = Path(__file__).resolve().parent.parent / "openapi.json"
+    en_disco = json.loads(ruta.read_text(encoding="utf-8"))
+    assert en_disco == _ESQUEMA, (
+        "openapi.json no coincide con app.openapi(). Regenéralo con el "
+        "comando de README.md §Especificación OpenAPI."
+    )
