@@ -183,6 +183,33 @@ def test_patch_cuerpo_vacio_200_sin_cambios(client, proyecto_id, estado_id):
     assert resp.json() == creada
 
 
+def test_patch_multiples_campos_a_la_vez(
+    client, proyecto_id, estado_id, otro_estado_id
+):
+    # Actualización parcial consistente con más de un campo a la vez
+    # (docs/contrato-api.md §Tareas v1), combinando v1 (title, state_id) con
+    # v2 (due_at) y v3 (priority) en el mismo PATCH.
+    creada = _crear(client, proyecto_id, estado_id, description="x").json()
+    resp = client.patch(
+        f"/tasks/{creada['id']}",
+        json={
+            "title": "Regar de nuevo",
+            "state_id": otro_estado_id,
+            "due_at": "2030-01-01T00:00:00+00:00",
+            "priority": "ALTA",
+        },
+    )
+    assert resp.status_code == 200
+    cuerpo = resp.json()
+    assert cuerpo["title"] == "Regar de nuevo"
+    assert cuerpo["state_id"] == otro_estado_id
+    assert cuerpo["due_at"] == "2030-01-01T00:00:00Z"
+    assert cuerpo["priority"] == "ALTA"
+    # lo no enviado no se toca
+    assert cuerpo["project_id"] == creada["project_id"]
+    assert cuerpo["description"] == creada["description"]
+
+
 def test_patch_description_a_null(client, proyecto_id, estado_id):
     creada = _crear(client, proyecto_id, estado_id, description="x").json()
     resp = client.patch(f"/tasks/{creada['id']}", json={"description": None})
