@@ -76,6 +76,12 @@ jobs:
           uv run python -c "import json; from app.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2, sort_keys=True))" > /tmp/openapi_actual.json
           diff /tmp/openapi_actual.json openapi.json
 
+      - name: Reaplica las migraciones tras la suite
+        # tests/test_migrations_cycle.py ejercita upgrade/downgrade y deja la
+        # base en "downgrade base" (esquema vacío) al terminar: hace falta
+        # volver a "head" antes de arrancar la API contra esta misma base.
+        run: uv run alembic upgrade head
+
       - name: Arranca la API en el puerto 8000
         run: |
           uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 \
