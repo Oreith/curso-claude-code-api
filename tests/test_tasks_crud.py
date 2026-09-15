@@ -217,6 +217,23 @@ def test_patch_state_id_inexistente_422(client, proyecto_id, estado_id):
     assert resp.status_code == 422
 
 
+def test_patch_project_id_null_422(client, proyecto_id, estado_id):
+    # project_id es obligatorio en el recurso (docs/contrato-api.md §Tareas
+    # v1): a diferencia de description/due_at/priority, un PATCH no puede
+    # ponerlo a null.
+    creada = _crear(client, proyecto_id, estado_id).json()
+    resp = client.patch(f"/tasks/{creada['id']}", json={"project_id": None})
+    assert resp.status_code == 422
+    assert "detail" in resp.json()
+
+
+def test_patch_state_id_null_422(client, proyecto_id, estado_id):
+    creada = _crear(client, proyecto_id, estado_id).json()
+    resp = client.patch(f"/tasks/{creada['id']}", json={"state_id": None})
+    assert resp.status_code == 422
+    assert "detail" in resp.json()
+
+
 def test_patch_id_inexistente_404(client):
     resp = client.patch("/tasks/9999", json={"title": "x"})
     assert resp.status_code == 404
